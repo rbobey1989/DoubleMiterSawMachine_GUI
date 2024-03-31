@@ -1,0 +1,25 @@
+
+#header {
+    background: rgb(54, 56, 58);
+	padding-top: 10px;
+	padding-left: 10px;
+	padding-right: 10px;
+	padding-bottom: 10px;
+	border-bottom-style: solid;
+	border-bottom-color: rgb(99, 102, 106);
+	border-bottom-width: 5px;			
+}
+
+#footer {
+    background: rgb(54, 56, 58);
+	padding-top: 5px;
+	padding-right: 10px;
+	padding-left: 10px;
+	border-top-style: solid;
+	border-top-color: rgb(99, 102, 106);
+	border-top-width: 5px;	
+}
+
+#notebookPages {
+	background: rgb(128, 132, 137);
+}

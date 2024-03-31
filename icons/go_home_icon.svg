@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="200"
+   height="200"
+   viewBox="0 0 52.916665 52.916666"
+   version="1.1"
+   id="svg5"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   sodipodi:docname="go_home_icon.svg"
+   inkscape:export-filename="go_home_icon.png"
+   inkscape:export-xdpi="60"
+   inkscape:export-ydpi="60"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview7"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="4.2835116"
+     inkscape:cx="93.498054"
+     inkscape:cy="97.116581"
+     inkscape:window-width="1920"
+     inkscape:window-height="1029"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs2">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient880">
+      <stop
+         style="stop-color:#8d0808;stop-opacity:1;"
+         offset="0"
+         id="stop876" />
+      <stop
+         style="stop-color:#cf1616;stop-opacity:1;"
+         offset="1"
+         id="stop878" />
+    </linearGradient>
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter4961"
+       x="-0.047999999"
+       y="-0.047999999"
+       width="1.096"
+       height="1.096">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="0.94881042"
+         id="feGaussianBlur4963" />
+    </filter>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient880"
+       id="linearGradient882"
+       x1="46.437763"
+       y1="46.308483"
+       x2="6.9249201"
+       y2="5.2254653"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <g
+     inkscape:label="Capa 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <circle
+       style="opacity:0.5;fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.672164;stroke-linecap:round;stroke-linejoin:round;filter:url(#filter4961)"
+       id="circle4959"
+       cx="27.167606"
+       cy="26.91534"
+       r="23.720261" />
+    <circle
+       style="opacity:1;fill:url(#linearGradient882);fill-opacity:1;stroke:none;stroke-width:0.672164;stroke-linecap:round;stroke-linejoin:round"
+       id="path1071"
+       cx="24.890461"
+       cy="24.638195"
+       r="23.720261" />
+    <path
+       id="rect234"
+       style="display:inline;opacity:1;fill:#ffffff;stroke:none;stroke-width:0.623049;stroke-linecap:round;stroke-linejoin:round"
+       d="M 24.890461,6.6844707 9.24527,26.086258 h 5.028882 v 15.541421 h 7.30371 v -7.562614 h 6.624541 v 7.562614 h 7.303712 V 26.086258 h 5.029537 l -5.716573,-7.089387 v -6.15761 h -3.355211 v 1.99682 z" />
+  </g>
+</svg>
