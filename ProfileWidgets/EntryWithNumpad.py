@@ -3,10 +3,8 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GObject
 import re,cairo
 
-
-
 class BubbleNumpad(Gtk.Overlay):
-    def __init__(self,parent):
+    def __init__(self,parent,h_align,v_align):
         Gtk.Overlay.__init__(self,can_focus=True)
 
         css_provider = Gtk.CssProvider()
@@ -14,6 +12,8 @@ class BubbleNumpad(Gtk.Overlay):
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)        
 
         self.par = parent
+        self.h_align = h_align
+        self.v_align = v_align
 
         label = [('1','2','3'),
                  ('4','5','6'),
@@ -23,18 +23,24 @@ class BubbleNumpad(Gtk.Overlay):
         self.drawingArea = Gtk.DrawingArea(can_focus=False)
         self.add_overlay(self.drawingArea)
 
-        grid = Gtk.Grid(can_focus=False,name='bubbleNumpadGrid')
+        self.grid = Gtk.Grid(can_focus=False,name='bubbleNumpadGrid')
         
         for i,row in enumerate(label):
             for j,col in enumerate(row):
                 button = Gtk.Button(label=col,can_focus=False,expand=True,name='bubbleNumpadButton')
-                grid.attach(button,j,i,1,1) 
+                self.grid.attach(button,j,i,1,1) 
                 button.connect('button-press-event',self.on_button_press_event_button)            
 
-        self.add_overlay(grid)
+        self.add_overlay(self.grid)
 
         self.drawingArea.connect("draw", self.on_draw)
         self.connect('focus-out-event',self.on_focus_out_event)
+
+    def get_h_align(self):
+        return self.h_align 
+
+    def get_v_align(self):
+        return self.v_align  
 
     def on_button_press_event_button(self, widget, event):
         if widget.get_label() != '←':
@@ -46,17 +52,77 @@ class BubbleNumpad(Gtk.Overlay):
         self.par.emit('hide-numpad')
 
     def on_draw(self, widget, ctx):
-        h = widget.get_allocated_height()
-        w = widget.get_allocated_width()
-        hp = self.par.get_allocated_height()
-        wp = self.par.get_allocated_width()
 
+        WIDTH = widget.get_allocated_width()
+        HEIGHT = widget.get_allocated_height()
+        PEAK_WIDTH = WIDTH*0.1
+        PEAK_HEIGHT = HEIGHT*0.075
+        X_OFFSET = WIDTH*0.05
+        Y_OFFSET = HEIGHT*0.05
+        BUTTON_OFFSET = ((WIDTH+HEIGHT)/2)*0.05
+
+        H_ALIGN_POINTS = {Gtk.ArrowType.RIGHT:(X_OFFSET,WIDTH-X_OFFSET,WIDTH-X_OFFSET,X_OFFSET+PEAK_WIDTH,X_OFFSET+PEAK_WIDTH),
+                        Gtk.ArrowType.LEFT:(X_OFFSET,WIDTH-X_OFFSET-PEAK_WIDTH,WIDTH-X_OFFSET-PEAK_WIDTH,WIDTH-X_OFFSET,X_OFFSET)}
+        V_ALIGN_POINTS = {Gtk.ArrowType.DOWN:(Y_OFFSET,Y_OFFSET,HEIGHT-Y_OFFSET,HEIGHT-Y_OFFSET,Y_OFFSET+PEAK_HEIGHT),
+                          Gtk.ArrowType.UP:(HEIGHT-Y_OFFSET,HEIGHT-Y_OFFSET,Y_OFFSET,Y_OFFSET,HEIGHT-Y_OFFSET-PEAK_HEIGHT)}
+
+        H_ALIGN_MARGINS = {Gtk.ArrowType.RIGHT:(X_OFFSET+PEAK_WIDTH+BUTTON_OFFSET,X_OFFSET+BUTTON_OFFSET),
+                        Gtk.ArrowType.LEFT:(X_OFFSET+BUTTON_OFFSET,X_OFFSET+PEAK_WIDTH+BUTTON_OFFSET)}
+       
         ctx.set_source_rgb(0, 0, 0)
-        ctx.set_line_width(2)  
-        ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-        ctx.set_line_join(cairo.LINE_JOIN_ROUND) 
-        ctx.rectangle(0,0,w,h)
-        ctx.fill()
+        ctx.set_line_width(20) 
+
+        for i in range(0,2):
+            ctx.move_to(H_ALIGN_POINTS[self.h_align][0],V_ALIGN_POINTS[self.v_align][0])
+            ctx.line_to(H_ALIGN_POINTS[self.h_align][1],V_ALIGN_POINTS[self.v_align][1])
+            ctx.line_to(H_ALIGN_POINTS[self.h_align][2],V_ALIGN_POINTS[self.v_align][2])
+            ctx.line_to(H_ALIGN_POINTS[self.h_align][3],V_ALIGN_POINTS[self.v_align][3])
+            ctx.line_to(H_ALIGN_POINTS[self.h_align][4],V_ALIGN_POINTS[self.v_align][4])
+            ctx.close_path() 
+            if i == 0:
+                ctx.set_line_join(cairo.LINE_JOIN_ROUND)      
+                ctx.stroke()  
+            else:
+                ctx.fill()  
+
+        self.grid.set_margin_left(H_ALIGN_MARGINS[self.h_align][0])
+        self.grid.set_margin_top(Y_OFFSET+BUTTON_OFFSET)
+        self.grid.set_margin_right(H_ALIGN_MARGINS[self.h_align][1])
+        self.grid.set_margin_bottom(Y_OFFSET+BUTTON_OFFSET)
+        
+        # if self.h_align == Gtk.ArrowType.RIGHT and self.v_align == Gtk.ArrowType.DOWN:
+        #     for i in range(0,2):
+        #         ctx.move_to(X_OFFSET,Y_OFFSET)
+        #         ctx.line_to(WIDTH-X_OFFSET,Y_OFFSET)
+        #         ctx.line_to(WIDTH-X_OFFSET,HEIGHT-Y_OFFSET)
+        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,HEIGHT-Y_OFFSET)
+        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,Y_OFFSET+PEAK_HEIGHT)
+        #         ctx.close_path() 
+        #         if i == 0:
+        #             ctx.set_line_join(cairo.LINE_JOIN_ROUND)      
+        #             ctx.stroke()  
+        #         else:
+        #             ctx.fill()
+
+        # if self.h_align == Gtk.ArrowType.RIGHT and self.v_align == Gtk.ArrowType.UP:
+        #     for i in range(0,2):
+        #         ctx.move_to(X_OFFSET,HEIGHT-Y_OFFSET)
+        #         ctx.line_to(WIDTH-X_OFFSET,HEIGHT-Y_OFFSET)
+        #         ctx.line_to(WIDTH-X_OFFSET,Y_OFFSET)
+        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,Y_OFFSET)
+        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,HEIGHT-Y_OFFSET-PEAK_HEIGHT)
+        #         ctx.close_path() 
+        #         if i == 0:
+        #             ctx.set_line_join(cairo.LINE_JOIN_ROUND)      
+        #             ctx.stroke()  
+        #         else:
+        #             ctx.fill()
+
+        
+
+        
+
+
         
         
 
@@ -69,6 +135,8 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         self,
         parent,
         label : str,
+        h_align_bubbleNumpad : Gtk.ArrowType,
+        v_align_bubbleNumpad : Gtk.ArrowType,     
         lower_limit : float = 240.00,
         upper_limit : float = 6500.00        
         ):
@@ -76,18 +144,23 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
         self.parent = parent
         self.label = label
+        self.h_align_bubbleNumpad = h_align_bubbleNumpad
+        self.v_align_bubbleNumpad = v_align_bubbleNumpad        
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit 
 
-        self.bubbleNumpad = BubbleNumpad(self)
+        self.bubbleNumpad = BubbleNumpad(self,self.h_align_bubbleNumpad,self.v_align_bubbleNumpad)
         self.bubbleNumpad.set_name(self.label+'BubbleNumpad')
-        # self.bubbleNumpad.set_halign(Gtk.Align.CENTER)
-        # self.bubbleNumpad.set_valign(Gtk.Align.CENTER)
         
         self.state = 0
 
         self.connect('show-numpad', self.show_numpad)
-        self.connect('hide-numpad', self.hide_numpad)       
+        self.connect('hide-numpad', self.hide_numpad) 
+
+    def get_parent(self):
+        return self.parent
+
+   
 
     def do_focus_in_event(self, event):
         self.emit('show-numpad')

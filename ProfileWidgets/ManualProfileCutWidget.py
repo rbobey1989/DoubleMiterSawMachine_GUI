@@ -78,7 +78,10 @@ class ManualProfileCutWidget(Gtk.Overlay):
             screen, self.provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )       
         
-        self.topLengthProfileEntry = EntryNumpad(self,label='entryLengthsTop')
+        self.topLengthProfileEntry = EntryNumpad(self,
+                                                 label='entryLengthsTop',
+                                                 h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
+                                                 v_align_bubbleNumpad=Gtk.ArrowType.DOWN)
         self.topLengthProfileEntry.set_name(name='entryLengths')
         self.topLengthProfileEntry.set_max_length(7)
         self.topLengthProfileEntry.set_alignment(xalign=0.5)
@@ -86,7 +89,10 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfileEntry.set_valign(Gtk.Align.START)
         self.add_overlay(self.topLengthProfileEntry)
      
-        self.bottomLengthProfileEntry = EntryNumpad(self,label='entryLengthsBottom')
+        self.bottomLengthProfileEntry = EntryNumpad(self,
+                                                    label='entryLengthsBottom',
+                                                    h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
+                                                    v_align_bubbleNumpad=Gtk.ArrowType.UP)                                               
         self.bottomLengthProfileEntry.set_name(name='entryLengths')
         self.bottomLengthProfileEntry.set_max_length(7)
         self.bottomLengthProfileEntry.set_alignment(xalign=0.5)
@@ -257,12 +263,17 @@ class ManualProfileCutWidget(Gtk.Overlay):
         LENGTH_WIDTH = width*self.length_width  
         
         if isinstance(widget, BubbleNumpad):
-            if widget.get_name().__contains__('LengthsTop'):
+                   
+            if widget.get_h_align() == Gtk.ArrowType.RIGHT:
                 allocation.x = WIDTH/2 + LENGTH_WIDTH/2
+            elif widget.get_h_align() == Gtk.ArrowType.LEFT:
+                allocation.x = WIDTH/2 - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD  
+            
+            if widget.get_v_align() == Gtk.ArrowType.DOWN:
                 allocation.y = PADDING_LINE
-            elif widget.get_name().__contains__('LengthsBottom'):
-                allocation.x = WIDTH/2 + LENGTH_WIDTH/2
-                allocation.y = HEIGHT/2
+            elif widget.get_v_align() == Gtk.ArrowType.UP:
+                allocation.y = HEIGHT - PADDING_LINE - HEIGHT_BUBBLE_NUMPAD
+
             allocation.width = WIDTH_BUBBLE_NUMPAD
             allocation.height = HEIGHT_BUBBLE_NUMPAD 
             return True

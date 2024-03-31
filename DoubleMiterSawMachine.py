@@ -1,7 +1,7 @@
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk,Gdk,GdkPixbuf
+from gi.repository import Gtk,Gdk
 
 from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget
 
@@ -12,8 +12,6 @@ buttonsWidth = 150
 buttonsHeight = 150
 torneiroLogoWidth = 300
 torneiroLogoHeight = 150
-
-
 
 class MyWindow(Gtk.Window):
     def __init__(self):
