@@ -15,13 +15,11 @@ class ManualProfileCutWidget(Gtk.Overlay):
         height_arrow :  float = 0.7,
         width_arrow :  float = 1.5,
         y_offset :  float = 0.4,
-        x_offset :  float = 0.1,
-        height_widget :  float = 1, 
-        width_height :  float  = 1,
+        x_offset :  float = 0.2,
         padding_line :  float = 0.15,
         length_width :  float = 0.25,
-        height_bubble_numpad : float = 0.60, 
-        width_bubble_numpad : float = 0.20
+        height_bubble_numpad : float = 0.50, 
+        width_bubble_numpad : float = 0.175        
         ):
         super(ManualProfileCutWidget, self).__init__(can_focus=True, focus_on_click=True) 
 
@@ -32,9 +30,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.y_offset      = y_offset     
         self.x_offset      = x_offset     
         self.padding_line  = padding_line 
-        self.length_width  = length_width 
+        self.length_width  = length_width  
         self.height_bubble_numpad = height_bubble_numpad 
-        self.width_bubble_numpad  = width_bubble_numpad       
+        self.width_bubble_numpad  = width_bubble_numpad   
 
         self.lefTipAngle = 90
         self.rightTipAngle = 90
@@ -53,24 +51,6 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.bottomLengthProfileString = str()
         self.focusBottomLengthProfile = False 
 
-        self.drawingArea = Gtk.DrawingArea(can_focus=True,focus_on_click=True)
-
-        self.drawingArea.set_events(
-            self.drawingArea.get_events()   |
-            Gdk.EventMask.BUTTON_PRESS_MASK |
-            Gdk.EventMask.KEY_PRESS_MASK
-            )
-
-        self.drawingArea.connect("draw", self.on_draw)
-        self.drawingArea.connect("focus-out-event",self.on_focus_out_event)
-        self.drawingArea.connect("focus-in-event",self.on_focus_in_event)        
-        self.drawingArea.connect("button-press-event", self.on_button_press)
-        self.drawingArea.connect("key-press-event",self.on_key_press)
-
-        self.connect('get-child-position',self.on_get_child_position)
-
-        self.add_overlay(self.drawingArea)         
-        
         screen = Gdk.Screen.get_default()
         self.provider = Gtk.CssProvider()
         style_context = Gtk.StyleContext()
@@ -78,27 +58,80 @@ class ManualProfileCutWidget(Gtk.Overlay):
             screen, self.provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )       
         
+
+        drawingArea = Gtk.DrawingArea(can_focus=True,focus_on_click=True)
+        drawingArea.set_name('manualCutProfileWidgetAnimation')
+
+        drawingArea.set_events(
+            drawingArea.get_events()   |
+            Gdk.EventMask.BUTTON_PRESS_MASK |
+            Gdk.EventMask.KEY_PRESS_MASK
+            )
+
+        drawingArea.connect("draw", self.on_draw)
+        drawingArea.connect("focus-out-event",self.on_focus_out_event)
+        drawingArea.connect("focus-in-event",self.on_focus_in_event)        
+        drawingArea.connect("button-press-event", self.on_button_press)
+        drawingArea.connect("key-press-event",self.on_key_press)
+
+        self.add_overlay(drawingArea) 
+        self.connect('get-child-position',self.on_get_child_position)        
+        
+
         self.topLengthProfileEntry = EntryNumpad(self,
-                                                 label='entryLengthsTop',
-                                                 h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
-                                                 v_align_bubbleNumpad=Gtk.ArrowType.DOWN)
-        self.topLengthProfileEntry.set_name(name='entryLengths')
+                                                 label='entryTopLengths',
+                                                 h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
+                                                 v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
+                                                 num_int_digits=4,
+                                                 num_decimal_digits=2                                                 
+                                                 )
+        self.topLengthProfileEntry.set_name('entryWithNumpadManualWidget')
         self.topLengthProfileEntry.set_max_length(7)
         self.topLengthProfileEntry.set_alignment(xalign=0.5)
         self.topLengthProfileEntry.set_halign(Gtk.Align.CENTER)
         self.topLengthProfileEntry.set_valign(Gtk.Align.START)
         self.add_overlay(self.topLengthProfileEntry)
+
+        self.leftAngleProfileEntry = EntryNumpad(self,
+                                                 label= 'entryLeftAngle',
+                                                 h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
+                                                 v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
+                                                 num_int_digits=2,
+                                                 num_decimal_digits=2                                                                                     
+                                                 )
+        self.leftAngleProfileEntry.set_name('entryWithNumpadManualWidget')
+        self.leftAngleProfileEntry.set_max_length(7)
+        self.leftAngleProfileEntry.set_alignment(xalign=0.5)
+        self.leftAngleProfileEntry.set_halign(Gtk.Align.START)
+        self.leftAngleProfileEntry.set_valign(Gtk.Align.CENTER)
+        self.add_overlay(self.leftAngleProfileEntry)
      
         self.bottomLengthProfileEntry = EntryNumpad(self,
-                                                    label='entryLengthsBottom',
+                                                    label='entryBottomLength',
                                                     h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
-                                                    v_align_bubbleNumpad=Gtk.ArrowType.UP)                                               
-        self.bottomLengthProfileEntry.set_name(name='entryLengths')
+                                                    v_align_bubbleNumpad=Gtk.ArrowType.UP,
+                                                    num_int_digits=4,
+                                                    num_decimal_digits=2)                                               
+        self.bottomLengthProfileEntry.set_name('entryWithNumpadManualWidget')
         self.bottomLengthProfileEntry.set_max_length(7)
         self.bottomLengthProfileEntry.set_alignment(xalign=0.5)
         self.bottomLengthProfileEntry.set_halign(Gtk.Align.CENTER)
         self.bottomLengthProfileEntry.set_valign(Gtk.Align.END)
-        self.add_overlay(self.bottomLengthProfileEntry)       
+        self.add_overlay(self.bottomLengthProfileEntry)   
+     
+        self.rightAngleProfileEntry = EntryNumpad(self,
+                                                  label='entryRightAngle',
+                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
+                                                  v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
+                                                  num_int_digits=2,
+                                                  num_decimal_digits=2                                                  
+                                                  )                                               
+        self.rightAngleProfileEntry.set_name('entryWithNumpadManualWidget')
+        self.rightAngleProfileEntry.set_max_length(7)
+        self.rightAngleProfileEntry.set_alignment(xalign=0.5)
+        self.rightAngleProfileEntry.set_halign(Gtk.Align.END)
+        self.rightAngleProfileEntry.set_valign(Gtk.Align.CENTER)
+        self.add_overlay(self.rightAngleProfileEntry)       
         
     def set_lefTipAngle(self,angle):
         self.lefTipAngle = angle
@@ -135,8 +168,10 @@ class ManualProfileCutWidget(Gtk.Overlay):
         LENGTH_WIDTH = width*self.length_width  
 
         css = str("""
-        #entryLengths {
-            font-size: """+ str(int(PADDING_LINE*0.8)) +"""px
+        #entryWithNumpadManualWidget {
+            font-size: """+ str(int(PADDING_LINE*0.8)) +"""px;
+            box-shadow: 5px 5px 5px 5px rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
         }
         """).encode()
         self.provider.load_from_data(css) 
@@ -145,12 +180,18 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE)) 
         self.topLengthProfileEntry.set_margin_top(PADDING_LINE-self.topLengthProfileEntry.get_allocated_height()/2)
 
+        self.leftAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
+        self.leftAngleProfileEntry.set_margin_left(PADDING_LINE/2)
 
         self.bottomLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE))
         self.bottomLengthProfileEntry.set_margin_bottom(PADDING_LINE-self.bottomLengthProfileEntry.get_allocated_height()/2)        
-                   
-        ctx.set_source_rgb(0.3, 0.2, 0.5)
-        ctx.set_line_width(2)  
+
+        self.rightAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
+        self.rightAngleProfileEntry.set_margin_right(PADDING_LINE/2)
+
+
+        ctx.set_source_rgb(0.99, 0.64, 0.07)
+        ctx.set_line_width(10)  
         ctx.set_line_cap(cairo.LINE_CAP_ROUND)
         ctx.set_line_join(cairo.LINE_JOIN_ROUND)     
 
@@ -261,18 +302,33 @@ class ManualProfileCutWidget(Gtk.Overlay):
         WIDTH_BUBBLE_NUMPAD = width*self.width_bubble_numpad
         PADDING_LINE = height*self.padding_line
         LENGTH_WIDTH = width*self.length_width  
-        
-        if isinstance(widget, BubbleNumpad):
-                   
-            if widget.get_h_align() == Gtk.ArrowType.RIGHT:
-                allocation.x = WIDTH/2 + LENGTH_WIDTH/2
-            elif widget.get_h_align() == Gtk.ArrowType.LEFT:
-                allocation.x = WIDTH/2 - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD  
-            
-            if widget.get_v_align() == Gtk.ArrowType.DOWN:
-                allocation.y = PADDING_LINE
-            elif widget.get_v_align() == Gtk.ArrowType.UP:
-                allocation.y = HEIGHT - PADDING_LINE - HEIGHT_BUBBLE_NUMPAD
+
+        if isinstance(widget, BubbleNumpad):  
+
+
+            if widget.get_parent().get_halign() == Gtk.Align.START:
+                if widget.get_h_align() == Gtk.ArrowType.RIGHT:
+                    allocation.x = PADDING_LINE/2 + LENGTH_WIDTH/2                
+            elif widget.get_parent().get_halign() == Gtk.Align.CENTER:
+                if widget.get_h_align() == Gtk.ArrowType.RIGHT:
+                    allocation.x = WIDTH/2 + LENGTH_WIDTH/2
+                elif widget.get_h_align() == Gtk.ArrowType.LEFT:
+                    allocation.x = WIDTH/2 - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD 
+            elif widget.get_parent().get_halign() == Gtk.Align.END:
+                if widget.get_h_align() == Gtk.ArrowType.LEFT:
+                    allocation.x = WIDTH - PADDING_LINE/2 - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD           
+
+            if widget.get_parent().get_valign() == Gtk.Align.START:
+                if widget.get_v_align() == Gtk.ArrowType.DOWN:
+                    allocation.y = PADDING_LINE
+            elif widget.get_parent().get_valign() == Gtk.Align.CENTER:
+                if widget.get_v_align() == Gtk.ArrowType.UP:
+                    allocation.y = HEIGHT/2 - HEIGHT_BUBBLE_NUMPAD
+                if widget.get_v_align() == Gtk.ArrowType.DOWN:
+                    allocation.y = HEIGHT/2
+            elif widget.get_parent().get_valign() == Gtk.Align.END:
+                if widget.get_v_align() == Gtk.ArrowType.UP:
+                    allocation.y = HEIGHT - PADDING_LINE - HEIGHT_BUBBLE_NUMPAD
 
             allocation.width = WIDTH_BUBBLE_NUMPAD
             allocation.height = HEIGHT_BUBBLE_NUMPAD 

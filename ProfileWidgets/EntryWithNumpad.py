@@ -4,7 +4,13 @@ from gi.repository import Gtk, Gdk, GObject
 import re,cairo
 
 class BubbleNumpad(Gtk.Overlay):
-    def __init__(self,parent,h_align,v_align):
+    def __init__(
+        self,
+        parent,
+        label,
+        h_align : Gtk.ArrowType,
+        v_align : Gtk.ArrowType
+        ):
         Gtk.Overlay.__init__(self,can_focus=True)
 
         css_provider = Gtk.CssProvider()
@@ -12,6 +18,7 @@ class BubbleNumpad(Gtk.Overlay):
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)        
 
         self.par = parent
+        self.label = label
         self.h_align = h_align
         self.v_align = v_align
 
@@ -36,11 +43,17 @@ class BubbleNumpad(Gtk.Overlay):
         self.drawingArea.connect("draw", self.on_draw)
         self.connect('focus-out-event',self.on_focus_out_event)
 
+    def get_parent(self):
+        return self.par
+    
     def get_h_align(self):
         return self.h_align 
 
     def get_v_align(self):
         return self.v_align  
+    
+    def get_label(self):
+        return self.label
 
     def on_button_press_event_button(self, widget, event):
         if widget.get_label() != '←':
@@ -59,10 +72,10 @@ class BubbleNumpad(Gtk.Overlay):
         PEAK_HEIGHT = HEIGHT*0.075
         X_OFFSET = WIDTH*0.05
         Y_OFFSET = HEIGHT*0.05
-        BUTTON_OFFSET = ((WIDTH+HEIGHT)/2)*0.05
+        BUTTON_OFFSET = ((WIDTH+HEIGHT)/2)*0.025
 
         H_ALIGN_POINTS = {Gtk.ArrowType.RIGHT:(X_OFFSET,WIDTH-X_OFFSET,WIDTH-X_OFFSET,X_OFFSET+PEAK_WIDTH,X_OFFSET+PEAK_WIDTH),
-                        Gtk.ArrowType.LEFT:(X_OFFSET,WIDTH-X_OFFSET-PEAK_WIDTH,WIDTH-X_OFFSET-PEAK_WIDTH,WIDTH-X_OFFSET,X_OFFSET)}
+                        Gtk.ArrowType.LEFT:(WIDTH-X_OFFSET,X_OFFSET,X_OFFSET,WIDTH-X_OFFSET-PEAK_WIDTH,WIDTH-X_OFFSET-PEAK_WIDTH)}
         V_ALIGN_POINTS = {Gtk.ArrowType.DOWN:(Y_OFFSET,Y_OFFSET,HEIGHT-Y_OFFSET,HEIGHT-Y_OFFSET,Y_OFFSET+PEAK_HEIGHT),
                           Gtk.ArrowType.UP:(HEIGHT-Y_OFFSET,HEIGHT-Y_OFFSET,Y_OFFSET,Y_OFFSET,HEIGHT-Y_OFFSET-PEAK_HEIGHT)}
 
@@ -70,7 +83,7 @@ class BubbleNumpad(Gtk.Overlay):
                         Gtk.ArrowType.LEFT:(X_OFFSET+BUTTON_OFFSET,X_OFFSET+PEAK_WIDTH+BUTTON_OFFSET)}
        
         ctx.set_source_rgb(0, 0, 0)
-        ctx.set_line_width(20) 
+        ctx.set_line_width(10) 
 
         for i in range(0,2):
             ctx.move_to(H_ALIGN_POINTS[self.h_align][0],V_ALIGN_POINTS[self.v_align][0])
@@ -89,42 +102,8 @@ class BubbleNumpad(Gtk.Overlay):
         self.grid.set_margin_top(Y_OFFSET+BUTTON_OFFSET)
         self.grid.set_margin_right(H_ALIGN_MARGINS[self.h_align][1])
         self.grid.set_margin_bottom(Y_OFFSET+BUTTON_OFFSET)
-        
-        # if self.h_align == Gtk.ArrowType.RIGHT and self.v_align == Gtk.ArrowType.DOWN:
-        #     for i in range(0,2):
-        #         ctx.move_to(X_OFFSET,Y_OFFSET)
-        #         ctx.line_to(WIDTH-X_OFFSET,Y_OFFSET)
-        #         ctx.line_to(WIDTH-X_OFFSET,HEIGHT-Y_OFFSET)
-        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,HEIGHT-Y_OFFSET)
-        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,Y_OFFSET+PEAK_HEIGHT)
-        #         ctx.close_path() 
-        #         if i == 0:
-        #             ctx.set_line_join(cairo.LINE_JOIN_ROUND)      
-        #             ctx.stroke()  
-        #         else:
-        #             ctx.fill()
-
-        # if self.h_align == Gtk.ArrowType.RIGHT and self.v_align == Gtk.ArrowType.UP:
-        #     for i in range(0,2):
-        #         ctx.move_to(X_OFFSET,HEIGHT-Y_OFFSET)
-        #         ctx.line_to(WIDTH-X_OFFSET,HEIGHT-Y_OFFSET)
-        #         ctx.line_to(WIDTH-X_OFFSET,Y_OFFSET)
-        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,Y_OFFSET)
-        #         ctx.line_to(X_OFFSET+PEAK_WIDTH,HEIGHT-Y_OFFSET-PEAK_HEIGHT)
-        #         ctx.close_path() 
-        #         if i == 0:
-        #             ctx.set_line_join(cairo.LINE_JOIN_ROUND)      
-        #             ctx.stroke()  
-        #         else:
-        #             ctx.fill()
-
-        
-
-        
 
 
-        
-        
 
 class EntryNumpad(Gtk.Entry,Gtk.Editable):
     __gsignals__ = {
@@ -136,9 +115,11 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         parent,
         label : str,
         h_align_bubbleNumpad : Gtk.ArrowType,
-        v_align_bubbleNumpad : Gtk.ArrowType,     
+        v_align_bubbleNumpad : Gtk.ArrowType,  
+        num_int_digits : int = 4,
+        num_decimal_digits : int = 2,    
         lower_limit : float = 240.00,
-        upper_limit : float = 6500.00        
+        upper_limit : float = 6500.00      
         ):
         super(EntryNumpad,self).__init__() 
 
@@ -148,9 +129,11 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         self.v_align_bubbleNumpad = v_align_bubbleNumpad        
         self.lower_limit = lower_limit
         self.upper_limit = upper_limit 
+        self.num_int_digits = num_int_digits - 1
+        self.num_decimal_digits = num_decimal_digits
 
-        self.bubbleNumpad = BubbleNumpad(self,self.h_align_bubbleNumpad,self.v_align_bubbleNumpad)
-        self.bubbleNumpad.set_name(self.label+'BubbleNumpad')
+
+        self.bubbleNumpad = BubbleNumpad(self,self.label+'BubbleNumpad',self.h_align_bubbleNumpad,self.v_align_bubbleNumpad)
         
         self.state = 0
 
@@ -160,20 +143,17 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
     def get_parent(self):
         return self.parent
 
-   
-
     def do_focus_in_event(self, event):
         self.emit('show-numpad')
         return Gtk.Entry.do_focus_in_event(self, event)
 
     def get_child_widget_by_name(self,overlay):
         for widget in overlay.get_children():
-            if isinstance(widget, BubbleNumpad) and widget.get_name() == self.bubbleNumpad.get_name():
+            if isinstance(widget, BubbleNumpad) and widget.get_label() == self.bubbleNumpad.get_label():
                 return widget
         return None  
 
     def show_numpad(self, widget):
-        
         if self.get_child_widget_by_name(self.parent) == None:
             self.parent.add_overlay(self.bubbleNumpad) 
         self.bubbleNumpad.show_all()
@@ -184,7 +164,7 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
 
     def validate_float_string(self,input_string, lower_limit, upper_limit):
-        pattern = r'^([1-9]\d{0,3}|0)(\.|\.\d{1,2})?$'
+        pattern = r"^([1-9]\d{{0,{}}}|0)(\.|\.\d{{1,{}}})?$".format(self.num_int_digits,self.num_decimal_digits)
         # return re.match(pattern, input_string) is not None and lower_limit <= float(input_string) <= upper_limit
         return re.match(pattern, input_string)    
 

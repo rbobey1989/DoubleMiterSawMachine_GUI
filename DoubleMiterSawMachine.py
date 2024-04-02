@@ -24,8 +24,8 @@ class MyWindow(Gtk.Window):
         css_provider.load_from_path('css_styles_sheets/style.css')
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-        self.angleRightHeadManualState = str('max')
-        self.angleLeftHeadManualState = str('max')
+        self.angleRightHeadManualState = 0
+        self.angleLeftHeadManualState = 0
 
         torneiroLogo = Gtk.Image.new_from_file(filename="images/torneiro_logo.png") 
 
@@ -137,7 +137,6 @@ class MyWindow(Gtk.Window):
         #Build Manual Cutting Page 
 
         self.manualCuttingProfileWidget = ManualProfileCutWidget(self)
-       
 
         self.playManualBtn = Gtk.EventBox(can_focus=True)
         self.playManualBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))  
@@ -179,8 +178,6 @@ class MyWindow(Gtk.Window):
         self.angleRightHeadManualBtn.connect('button-release-event',self.on_angleRightHeadManual_btn_released)         
 
         #Build Auto Cutting Page
-
-       
 
         gridAutoPage = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)        
         gridAutoPage.add(Gtk.Label(label="Logo"))
@@ -311,37 +308,52 @@ class MyWindow(Gtk.Window):
 
     def on_angleLeftHeadManual_btn_pressed(self,widget,event):
         widget.grab_focus()
+        angleHeadManualState = {'90':0,'45':1,'angle':2}
         child = widget.get_child()
-        if self.angleLeftHeadManualState == 'max':
+        if self.angleLeftHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/left_head_angle_90_icon_pressed.png")
-        elif self.angleLeftHeadManualState == 'min':
-            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.png")        
+        elif self.angleLeftHeadManualState == angleHeadManualState['45']:
+            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.png") 
+        elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
+            child.set_from_file(filename="icons/left_head_angle_variable_icon.png")       
 
     def on_angleLeftHeadManual_btn_released(self,widget,event): 
         child = widget.get_child() 
-        if self.angleLeftHeadManualState == 'max':
+        angleHeadManualState = {'90':0,'45':1,'angle':2}
+        if self.angleLeftHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/left_head_angle_45_icon.png")
-            self.angleLeftHeadManualState = 'min'
-        elif self.angleLeftHeadManualState == 'min':
-            child.set_from_file(filename="icons/left_head_angle_90_icon.png") 
-            self.angleLeftHeadManualState = 'max'   
+            self.angleLeftHeadManualState = angleHeadManualState['45']
+        elif self.angleLeftHeadManualState == angleHeadManualState['45']:
+            child.set_from_file(filename="icons/left_head_angle_variable_icon.png") 
+            self.angleLeftHeadManualState = angleHeadManualState['angle'] 
+        elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
+            child.set_from_file(filename="icons/left_head_angle_90_icon.png")
+            self.angleLeftHeadManualState = angleHeadManualState['90'] 
 
     def on_angleRightHeadManual_btn_pressed(self,widget,event):
         widget.grab_focus()
+        angleHeadManualState = {'90':0,'45':1,'angle':2}
         child = widget.get_child()
-        if self.angleRightHeadManualState == 'max':
+        if self.angleRightHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/right_head_angle_90_icon_pressed.png")
-        elif self.angleRightHeadManualState == 'min':
-            child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.png")        
+        elif self.angleRightHeadManualState == angleHeadManualState['45']:
+            child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.png") 
+        elif self.angleRightHeadManualState == angleHeadManualState['angle']:
+            child.set_from_file(filename="icons/right_head_angle_variable_icon.png")              
 
     def on_angleRightHeadManual_btn_released(self,widget,event): 
         child = widget.get_child() 
-        if self.angleRightHeadManualState == 'max':
+        angleHeadManualState = {'90':0,'45':1,'angle':2}
+        if self.angleRightHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/right_head_angle_45_icon.png")
-            self.angleRightHeadManualState = 'min'
-        elif self.angleRightHeadManualState == 'min':
-            child.set_from_file(filename="icons/right_head_angle_90_icon.png") 
-            self.angleRightHeadManualState = 'max'                          
+            self.angleRightHeadManualState = angleHeadManualState['45']
+        elif self.angleRightHeadManualState == angleHeadManualState['45']:
+            child.set_from_file(filename="icons/right_head_angle_variable_icon.png") 
+            self.angleRightHeadManualState = angleHeadManualState['angle'] 
+        elif self.angleRightHeadManualState == angleHeadManualState['angle']:
+            child.set_from_file(filename="icons/right_head_angle_90_icon.png")
+            self.angleRightHeadManualState = angleHeadManualState['90']
+
 
     def on_switch_page(self,notebook, page, page_num):
         if notebook == self.notebookPages:
