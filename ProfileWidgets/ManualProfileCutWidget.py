@@ -49,12 +49,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.rightTipAngle = 90
         self.topLengthProfile = 0
         self.bottomLengthProfile = 0
-        self.heightProfile = 70
+        self.heightProfile = 0
 
-        self.topLengthProfileString = str()
         self.focusTopLengthProfile = False
-
-        self.bottomLengthProfileString = str()
         self.focusBottomLengthProfile = False 
 
         screen = Gdk.Screen.get_default()
@@ -276,18 +273,12 @@ class ManualProfileCutWidget(Gtk.Overlay):
         pass        
 
     def on_button_press(self, widget, event):
-        """When a button is pressed, the location gets stored and the canvas
-        gets updated.
-        """
 
         height = widget.get_allocated_height()
         width = widget.get_allocated_width()
 
         widget.grab_focus()
 
-        # Gtk.Window.translate_coordinates
-        # X0 = geom.x
-        # Y0 = geom.y
         HEIGHT = height 
         WIDTH = width 
         PADDING_LINE = height*self.padding_line 
@@ -354,9 +345,17 @@ class ManualProfileCutWidget(Gtk.Overlay):
         else:
             return False
         
+    # def set_tipAngle(self,entry,value):
+    #     if entry == self.leftAngleProfileEntry:
+    #         self.set_lefTipAngle(value)
+    #         return
+    #     else:
+    #         self.set_rightTipAngle(value)
+
+        
     def on_update_value(self,widget,value,entry):
         if entry == self.leftAngleProfileEntry or entry == self.rightAngleProfileEntry:
-            set_tipAngle = lambda x,y: self.set_lefTipAngle(y) if x == self.leftAngleProfileEntry else self.set_rightTipAngle(y) 
+            set_tipAngle = lambda e,v: self.set_lefTipAngle(v) if e == self.leftAngleProfileEntry else self.set_rightTipAngle(v)
             if value > self.max_angle: 
                 set_tipAngle(entry,self.max_angle)
                 entry.set_text(str(round(self.max_angle,2)))
@@ -365,6 +364,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                 entry.set_text(str(round(self.min_angle,2)))
             else: 
                 set_tipAngle(entry,value)
+            
         elif entry == self.topLengthProfileEntry or entry == self.bottomLengthProfileEntry:            
             set_sideLength = lambda x,y: self.set_topLengthProfile(y) if x == self.topLengthProfileEntry else self.set_bottomLengthProfile(y)
             if value > self.max_length:

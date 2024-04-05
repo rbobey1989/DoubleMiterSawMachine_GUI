@@ -27,7 +27,7 @@ class BubbleNumpad(Gtk.Overlay):
                  ('7','8','9'),
                  ('.','0','←')]
         
-        drawingArea = Gtk.DrawingArea(can_focus=False,)
+        drawingArea = Gtk.DrawingArea(can_focus=False)
         self.add_overlay(drawingArea)
         
 
@@ -37,8 +37,8 @@ class BubbleNumpad(Gtk.Overlay):
             for j,col in enumerate(row):
                 button = Gtk.Button(label=col,can_focus=False,expand=True,name='bubbleNumpadButton')
                 self.grid.attach(button,j,i,1,1) 
-                button.connect('button-press-event',self.on_button_press_event_button)            
-
+                button.connect('button-press-event',self.on_button_press_event_button) 
+                           
         self.add_overlay(self.grid)
 
         drawingArea.connect("draw", self.on_draw)
