@@ -120,8 +120,7 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         v_align_bubbleNumpad : Gtk.ArrowType,  
         num_int_digits : int = 4,
         num_decimal_digits : int = 2,    
-        lower_limit : float = 240.00,
-        upper_limit : float = 6500.00      
+     
         ):
         super(EntryNumpad,self).__init__() 
 
@@ -129,8 +128,6 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         self.label = label
         self.h_align_bubbleNumpad = h_align_bubbleNumpad
         self.v_align_bubbleNumpad = v_align_bubbleNumpad        
-        self.lower_limit = lower_limit
-        self.upper_limit = upper_limit 
         self.num_int_digits = num_int_digits - 1
         self.num_decimal_digits = num_decimal_digits
 
@@ -144,6 +141,9 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
     def get_parent(self):
         return self.parent
+    
+    def get_label(self):
+        return self.label
 
     def do_focus_in_event(self, event):
         self.emit('show-numpad')

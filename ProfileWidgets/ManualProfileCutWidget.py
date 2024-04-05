@@ -23,7 +23,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
         length_width :  float = 0.25,
         height_bubble_numpad : float = 0.50, 
         width_bubble_numpad : float = 0.175,
-        inside_angles: bool = True,   
+        min_length : float = 240.00,
+        max_length : float = 6500.00,            
         min_angle: float = 22.5,
         max_angle: float = 157.5    
         ):
@@ -39,7 +40,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.length_width  = length_width  
         self.height_bubble_numpad = height_bubble_numpad 
         self.width_bubble_numpad  = width_bubble_numpad   
-        self.inside_angles = inside_angles
+        self.min_length = min_length
+        self.max_length = max_length 
         self.min_angle = min_angle
         self.max_angle = max_angle
 
@@ -48,11 +50,6 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfile = 0
         self.bottomLengthProfile = 0
         self.heightProfile = 70
-
-        self.maxLengthProfile = 6500
-        self.minLength = 240
-        self.string_length = 7 
-        self.current_string_length = self.string_length  
 
         self.topLengthProfileString = str()
         self.focusTopLengthProfile = False
@@ -359,18 +356,22 @@ class ManualProfileCutWidget(Gtk.Overlay):
         
     def on_update_value(self,widget,value,entry):
         if entry == self.leftAngleProfileEntry or entry == self.rightAngleProfileEntry:
-            if value > self.max_angle:
-                lambda x: self.leftAngleProfileEntry if x == self.leftAngleProfileEntry else self.rightAngleProfileEntry
-                self.set_lefTipAngle(self.max_angle)  
+            set_tipAngle = lambda x,y: self.set_lefTipAngle(y) if x == self.leftAngleProfileEntry else self.set_rightTipAngle(y) 
+            if value > self.max_angle: 
+                set_tipAngle(entry,self.max_angle)
                 entry.set_text(str(round(self.max_angle,2)))
             elif value < self.min_angle:
-                self.set_lefTipAngle(self.min_angle) 
+                set_tipAngle(entry,self.min_angle)                
                 entry.set_text(str(round(self.min_angle,2)))
             else: 
-                self.set_lefTipAngle(value)
-        # elif entry == self.rightAngleProfileEntry:
-        #     self.set_rightTipAngle(value)
-        elif entry == self.topLengthProfileEntry:
-            self.set_topLengthProfile(value)
-        elif entry == self.bottomLengthProfileEntry:
-            self.set_bottomLengthProfile(value)
+                set_tipAngle(entry,value)
+        elif entry == self.topLengthProfileEntry or entry == self.bottomLengthProfileEntry:            
+            set_sideLength = lambda x,y: self.set_topLengthProfile(y) if x == self.topLengthProfileEntry else self.set_bottomLengthProfile(y)
+            if value > self.max_length:
+                set_sideLength(entry,self.max_length)
+                entry.set_text(str(round(self.max_length,2)))
+            elif value < self.min_length:
+                set_sideLength(entry,self.min_length)
+                entry.set_text(str(round(self.min_length,2)))    
+            else:
+                set_sideLength(entry,value)
