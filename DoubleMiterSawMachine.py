@@ -87,7 +87,6 @@ class MyWindow(Gtk.Window):
 
         vBoxMainStruct.pack_end(vBoxFooter,False,True,0)                          
 
-
         #Build Main Page
 
         self.manualCuttingBtn = Gtk.EventBox()
@@ -313,15 +312,15 @@ class MyWindow(Gtk.Window):
         if self.angleLeftHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/left_head_angle_90_icon_pressed.png")
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.png") 
+            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.svg") 
         elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/left_head_angle_variable_icon.png")       
+            child.set_from_file(filename="icons/left_head_angle_variable_icon_pressed.png")       
 
     def on_angleLeftHeadManual_btn_released(self,widget,event): 
         child = widget.get_child() 
         angleHeadManualState = {'90':0,'45':1,'angle':2}
         if self.angleLeftHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/left_head_angle_45_icon.png")
+            child.set_from_file(filename="icons/left_head_angle_45_icon.svg")
             self.angleLeftHeadManualState = angleHeadManualState['45']
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
             child.set_from_file(filename="icons/left_head_angle_variable_icon.png") 
@@ -337,15 +336,15 @@ class MyWindow(Gtk.Window):
         if self.angleRightHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/right_head_angle_90_icon_pressed.png")
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.png") 
+            child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.svg") 
         elif self.angleRightHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/right_head_angle_variable_icon.png")              
+            child.set_from_file(filename="icons/right_head_angle_variable_icon_pressed.png")              
 
     def on_angleRightHeadManual_btn_released(self,widget,event): 
         child = widget.get_child() 
         angleHeadManualState = {'90':0,'45':1,'angle':2}
         if self.angleRightHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/right_head_angle_45_icon.png")
+            child.set_from_file(filename="icons/right_head_angle_45_icon.svg")
             self.angleRightHeadManualState = angleHeadManualState['45']
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
             child.set_from_file(filename="icons/right_head_angle_variable_icon.png") 

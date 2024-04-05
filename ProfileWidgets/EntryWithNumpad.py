@@ -27,8 +27,9 @@ class BubbleNumpad(Gtk.Overlay):
                  ('7','8','9'),
                  ('.','0','←')]
         
-        self.drawingArea = Gtk.DrawingArea(can_focus=False)
-        self.add_overlay(self.drawingArea)
+        drawingArea = Gtk.DrawingArea(can_focus=False,)
+        self.add_overlay(drawingArea)
+        
 
         self.grid = Gtk.Grid(can_focus=False,name='bubbleNumpadGrid')
         
@@ -40,7 +41,7 @@ class BubbleNumpad(Gtk.Overlay):
 
         self.add_overlay(self.grid)
 
-        self.drawingArea.connect("draw", self.on_draw)
+        drawingArea.connect("draw", self.on_draw)
         self.connect('focus-out-event',self.on_focus_out_event)
 
     def get_parent(self):
@@ -56,6 +57,7 @@ class BubbleNumpad(Gtk.Overlay):
         return self.label
 
     def on_button_press_event_button(self, widget, event):
+        widget = widget.get_child() 
         if widget.get_label() != '←':
             self.par.set_text(self.par.get_text() + widget.get_label())
         else:
@@ -108,7 +110,7 @@ class BubbleNumpad(Gtk.Overlay):
 class EntryNumpad(Gtk.Entry,Gtk.Editable):
     __gsignals__ = {
         'show-numpad': (GObject.SignalFlags.RUN_FIRST, None, ()),
-        'hide-numpad': (GObject.SignalFlags.RUN_FIRST, None, ())
+        'hide-numpad': (GObject.SignalFlags.RUN_FIRST, None, ()),
     }
     def __init__(
         self,
@@ -159,18 +161,27 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         self.bubbleNumpad.show_all()
         self.bubbleNumpad.grab_focus()           
 
-    def hide_numpad(self, widget):     
+    def hide_numpad(self, widget):
+        if self.get_text():
+            if '.' in self.get_text():
+                if '.' == self.get_text()[-1]:
+                    self.set_text(self.get_text()+'00')
+                else:
+                    self.set_text(self.get_text()+'0')
+            else:
+                self.set_text(self.get_text()+'.00')
+            self.parent.emit('update-value',float(self.get_text()),self)
         self.bubbleNumpad.hide()
+        
 
 
-    def validate_float_string(self,input_string, lower_limit, upper_limit):
+    def validate_float_string(self,input_string):
         pattern = r"^([1-9]\d{{0,{}}}|0)(\.|\.\d{{1,{}}})?$".format(self.num_int_digits,self.num_decimal_digits)
-        # return re.match(pattern, input_string) is not None and lower_limit <= float(input_string) <= upper_limit
         return re.match(pattern, input_string)    
 
     def do_insert_text(self, new_text, length, position):
         
-        validate_float_string = self.validate_float_string(new_text,self.lower_limit,self.upper_limit)
+        validate_float_string = self.validate_float_string(new_text)
 
         if validate_float_string:
             self.get_buffer().insert_text(position, new_text, length)
@@ -178,49 +189,3 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
         self.get_buffer().insert_text(position, new_text[:-1], length-1)
         return position
-
-        # validate_float_string = self.validate_float_string(new_text,self.lower_limit,self.upper_limit)
-
-        # if new_text.__len__() <= 4 and new_text[-1] != '.' and new_text.isnumeric() and float(new_text) <= self.upper_limit:
-        #     if self.get_text().__len__() == 0 and new_text == '0': 
-        #         return position
-        #     else:
-        #         self.get_buffer().insert_text(position, new_text, length)
-        #         return position + length
-        # elif self.validate_float_string(new_text,self.lower_limit,self.upper_limit):
-        #     self.get_buffer().insert_text(position, new_text, length)
-        #     return position + length
-        # else:
-        #     if float(new_text) < self.lower_limit :
-        #         self.get_buffer().insert_text(position, str(round(self.lower_limit,2)), length)
-        #         return str(round(self.lower_limit,2)).__len__()
-        #     elif float(new_text) > self.upper_limit: 
-        #         self.get_buffer().insert_text(position, str(round(self.upper_limit,2)), length)
-        #         return str(round(self.upper_limit,2)).__len__()
-        #     # self.get_buffer().insert_text(position, new_text[-1], length)
-        #     # return position + length -1
-        # return position
-    
-
-# class EntryWindow(Gtk.Window):
-#     def __init__(self):
-#         Gtk.Window.__init__(self, title="Entry Widget Example")
-#         self.set_default_size(200, 100)
-
-           
-
-#         button = Gtk.Button()
-
-#         box = Gtk.VBox()
-
-#         self.entry = EntryWithSignal(self)   
-
-#         box.pack_start(button,True,True,10)
-#         box.pack_start(self.entry,True,True,10)
-#         self.add(box)
-
-
-# win = EntryWindow()
-# win.connect("destroy", Gtk.main_quit)
-# win.show_all()
-# Gtk.main()
