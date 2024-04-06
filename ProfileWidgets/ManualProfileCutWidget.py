@@ -9,7 +9,7 @@ from .EntryWithNumpad import EntryNumpad,BubbleNumpad
 
 class ManualProfileCutWidget(Gtk.Overlay):
     __gsignals__ = {
-        'update-value': (GObject.SignalFlags.RUN_FIRST, None, (float,EntryNumpad))
+        'update-value': (GObject.SignalFlags.RUN_FIRST, None, (EntryNumpad,float))
     }
     def __init__(
         self, 
@@ -47,11 +47,11 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         self.lefTipAngle = 90
         self.rightTipAngle = 90
-        self.topLengthProfile = 0
-        self.bottomLengthProfile = 0
-        self.heightProfile = 0
+        self.topLengthProfile = 1000
+        self.bottomLengthProfile = 1000
+        self.heightProfile = 100
 
-        self.focusTopLengthProfile = False
+        self.focusTopLengthProfile = True
         self.focusBottomLengthProfile = False 
 
         screen = Gdk.Screen.get_default()
@@ -67,15 +67,13 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         drawingArea.set_events(
             drawingArea.get_events()   |
-            Gdk.EventMask.BUTTON_PRESS_MASK |
-            Gdk.EventMask.KEY_PRESS_MASK
+            Gdk.EventMask.BUTTON_PRESS_MASK
             )
 
         drawingArea.connect("draw", self.on_draw)
         drawingArea.connect("focus-out-event",self.on_focus_out_event)
         drawingArea.connect("focus-in-event",self.on_focus_in_event)        
         drawingArea.connect("button-press-event", self.on_button_press)
-        drawingArea.connect("key-press-event",self.on_key_press)
 
         self.add_overlay(drawingArea) 
         self.connect('get-child-position',self.on_get_child_position) 
@@ -87,7 +85,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                  v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                  num_int_digits=4,
-                                                 num_decimal_digits=2                                                 
+                                                 num_decimal_digits=2, 
+                                                 init_value=self.topLengthProfile                                                
                                                  )
         self.topLengthProfileEntry.set_name('entryWithNumpadManualWidget')
         self.topLengthProfileEntry.set_max_length(7)
@@ -101,7 +100,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                  h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
                                                  v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                  num_int_digits=3,
-                                                 num_decimal_digits=2                                                                                     
+                                                 num_decimal_digits=2,
+                                                 init_value=self.lefTipAngle                                                                                     
                                                  )
         self.leftAngleProfileEntry.set_name('entryWithNumpadManualWidget')
         self.leftAngleProfileEntry.set_max_length(7)
@@ -115,7 +115,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                     h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
                                                     v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                     num_int_digits=4,
-                                                    num_decimal_digits=2)                                               
+                                                    num_decimal_digits=2,
+                                                    init_value=self.bottomLengthProfile
+                                                    )                                               
         self.bottomLengthProfileEntry.set_name('entryWithNumpadManualWidget')
         self.bottomLengthProfileEntry.set_max_length(7)
         self.bottomLengthProfileEntry.set_alignment(xalign=0.5)
@@ -128,7 +130,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                   h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                   v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                   num_int_digits=3,
-                                                  num_decimal_digits=2                                                  
+                                                  num_decimal_digits=2,
+                                                  init_value=self.rightTipAngle                                                  
                                                   )                                               
         self.rightAngleProfileEntry.set_name('entryWithNumpadManualWidget')
         self.rightAngleProfileEntry.set_max_length(7)
@@ -177,7 +180,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE)) 
         self.topLengthProfileEntry.set_margin_top(PADDING_LINE-self.topLengthProfileEntry.get_allocated_height()/2)
 
-        self.leftAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
+        self.leftAngleProfileEntry.set_size_request(width=LENGTH_WIDTH*3/5,height=int(PADDING_LINE)) 
         self.leftAngleProfileEntry.set_margin_left(PADDING_LINE/2)
 
         self.bottomLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE))
@@ -248,17 +251,40 @@ class ManualProfileCutWidget(Gtk.Overlay):
             ctx.set_source_rgb(1.0, 0.2, 0.5)
             ctx.stroke()              
 
-        ctx.move_to(X_OFFSET, Y_OFFSET - PADDING_LINE)
-        ctx.line_to(X_OFFSET, PADDING_LINE) 
-        ctx.line_to(((WIDTH-2*X_OFFSET) - LENGTH_WIDTH)/2 + X_OFFSET, PADDING_LINE) 
-        ctx.move_to(WIDTH-X_OFFSET, Y_OFFSET - PADDING_LINE)
-        ctx.line_to(WIDTH-X_OFFSET, PADDING_LINE) 
-        ctx.line_to(WIDTH- X_OFFSET - ((WIDTH-2*X_OFFSET) - LENGTH_WIDTH)/2, PADDING_LINE)  
-        ctx.move_to(math.tan(math.radians(90-self.lefTipAngle))*HEIGHT_PROF+X_OFFSET, HEIGHT_PROF + Y_OFFSET + PADDING_LINE)   
-        ctx.line_to(math.tan(math.radians(90-self.lefTipAngle))*HEIGHT_PROF+X_OFFSET, HEIGHT - PADDING_LINE) 
+        if self.lefTipAngle <= 90:
+            ctx.move_to(X_OFFSET, Y_OFFSET - PADDING_LINE)
+            ctx.line_to(X_OFFSET, PADDING_LINE) 
+        else:
+            ctx.move_to(math.tan(math.radians(90+self.lefTipAngle))*HEIGHT_PROF+X_OFFSET, Y_OFFSET - PADDING_LINE)
+            ctx.line_to(math.tan(math.radians(90+self.lefTipAngle))*HEIGHT_PROF+X_OFFSET, PADDING_LINE)  
+
+        ctx.line_to(((WIDTH-2*X_OFFSET) - LENGTH_WIDTH)/2 + X_OFFSET, PADDING_LINE)
+
+        if self.rightTipAngle <= 90:
+            ctx.move_to(WIDTH-X_OFFSET, Y_OFFSET - PADDING_LINE)
+            ctx.line_to(WIDTH-X_OFFSET, PADDING_LINE) 
+        else:
+            ctx.move_to(WIDTH-math.tan(math.radians(90+self.rightTipAngle))*HEIGHT_PROF-X_OFFSET, Y_OFFSET - PADDING_LINE)
+            ctx.line_to(WIDTH-math.tan(math.radians(90+self.rightTipAngle))*HEIGHT_PROF-X_OFFSET, PADDING_LINE)
+
+        ctx.line_to(WIDTH- X_OFFSET - ((WIDTH-2*X_OFFSET) - LENGTH_WIDTH)/2, PADDING_LINE) 
+
+        if self.lefTipAngle <= 90:
+            ctx.move_to(math.tan(math.radians(90-self.lefTipAngle))*HEIGHT_PROF+X_OFFSET, HEIGHT_PROF + Y_OFFSET + PADDING_LINE)   
+            ctx.line_to(math.tan(math.radians(90-self.lefTipAngle))*HEIGHT_PROF+X_OFFSET, HEIGHT - PADDING_LINE) 
+        else:
+            ctx.move_to(X_OFFSET, HEIGHT_PROF + Y_OFFSET + PADDING_LINE)   
+            ctx.line_to(X_OFFSET, HEIGHT - PADDING_LINE)             
+            
         ctx.line_to(WIDTH/2 - LENGTH_WIDTH/2,HEIGHT - PADDING_LINE)
-        ctx.move_to(WIDTH-math.tan(math.radians(90-self.rightTipAngle))*HEIGHT_PROF-X_OFFSET,HEIGHT_PROF + Y_OFFSET + PADDING_LINE)
-        ctx.line_to(WIDTH-math.tan(math.radians(90-self.rightTipAngle))*HEIGHT_PROF-X_OFFSET, HEIGHT - PADDING_LINE) 
+
+        if self.rightTipAngle <= 90:
+            ctx.move_to(WIDTH-math.tan(math.radians(90-self.rightTipAngle))*HEIGHT_PROF-X_OFFSET,HEIGHT_PROF + Y_OFFSET + PADDING_LINE)
+            ctx.line_to(WIDTH-math.tan(math.radians(90-self.rightTipAngle))*HEIGHT_PROF-X_OFFSET, HEIGHT - PADDING_LINE) 
+        else:
+            ctx.move_to(WIDTH-X_OFFSET,HEIGHT_PROF + Y_OFFSET + PADDING_LINE)
+            ctx.line_to(WIDTH-X_OFFSET, HEIGHT - PADDING_LINE)             
+
         ctx.line_to(WIDTH/2 + LENGTH_WIDTH/2,  HEIGHT - PADDING_LINE)
 
         ctx.set_line_width(2)
@@ -281,24 +307,17 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         HEIGHT = height 
         WIDTH = width 
-        PADDING_LINE = height*self.padding_line 
-        LENGTH_WIDTH = width*self.length_width  
+        HEIGHT_PROF = height*self.height_prof 
+        HEIGHT_ARROW =  HEIGHT_PROF*self.height_arrow
+        WIDTH_ARROW = HEIGHT_ARROW/self.width_arrow 
 
         if event.get_button()[1] == 1:
-            self.focusTopLengthProfile = False
-            self.focusBottomLengthProfile = False          
-            if event.x >= (WIDTH - LENGTH_WIDTH)/2 and event.x <= (WIDTH + LENGTH_WIDTH)/2:
-                if event.y >= 0 and event.y <= 2*PADDING_LINE:
-                    self.focusTopLengthProfile = True
-                    self.focusBottomLengthProfile = False                     
-                elif event.y >= HEIGHT-2*PADDING_LINE and event.y <= WIDTH:
-                    self.focusTopLengthProfile = False
-                    self.focusBottomLengthProfile = True                                                      
+                   
+            if event.x >= (WIDTH - WIDTH_ARROW)/2 and event.x <= (WIDTH + WIDTH_ARROW)/2: 
+                if event.y >= (HEIGHT - HEIGHT_ARROW)/2 and event.y <= (HEIGHT + HEIGHT_ARROW)/2:
+                    self.focusTopLengthProfile = not(self.focusTopLengthProfile)
+                    self.focusBottomLengthProfile = not(self.focusTopLengthProfile)                                                                           
             self.queue_draw()
-            
-    
-    def on_key_press(self, w, event):
-        pass
 
     def on_get_child_position(self, overlay, widget, allocation):
         
@@ -345,33 +364,39 @@ class ManualProfileCutWidget(Gtk.Overlay):
         else:
             return False
         
-    # def set_tipAngle(self,entry,value):
-    #     if entry == self.leftAngleProfileEntry:
-    #         self.set_lefTipAngle(value)
-    #         return
-    #     else:
-    #         self.set_rightTipAngle(value)
-
-        
-    def on_update_value(self,widget,value,entry):
+    def on_update_value(self,widget,entry, value):
         if entry == self.leftAngleProfileEntry or entry == self.rightAngleProfileEntry:
             set_tipAngle = lambda e,v: self.set_lefTipAngle(v) if e == self.leftAngleProfileEntry else self.set_rightTipAngle(v)
-            if value > self.max_angle: 
-                set_tipAngle(entry,self.max_angle)
-                entry.set_text(str(round(self.max_angle,2)))
-            elif value < self.min_angle:
-                set_tipAngle(entry,self.min_angle)                
-                entry.set_text(str(round(self.min_angle,2)))
-            else: 
-                set_tipAngle(entry,value)
-            
-        elif entry == self.topLengthProfileEntry or entry == self.bottomLengthProfileEntry:            
-            set_sideLength = lambda x,y: self.set_topLengthProfile(y) if x == self.topLengthProfileEntry else self.set_bottomLengthProfile(y)
-            if value > self.max_length:
-                set_sideLength(entry,self.max_length)
-                entry.set_text(str(round(self.max_length,2)))
-            elif value < self.min_length:
-                set_sideLength(entry,self.min_length)
-                entry.set_text(str(round(self.min_length,2)))    
+            get_tipAngle = lambda e: self.lefTipAngle if e == self.leftAngleProfileEntry else self.rightTipAngle
+            if entry.get_text():
+                if value > self.max_angle: 
+                    set_tipAngle(entry,self.max_angle)
+                    entry.set_text('%.2f'%self.max_angle)
+                elif value < self.min_angle:
+                    set_tipAngle(entry,self.min_angle)                
+                    entry.set_text('%.2f'%self.min_angle)
+                else: 
+                    set_tipAngle(entry,value)
             else:
-                set_sideLength(entry,value)
+                entry.set_text('%.2f'%get_tipAngle(entry))   
+        elif entry == self.topLengthProfileEntry or entry == self.bottomLengthProfileEntry:            
+            set_sideLength = lambda e,v: self.set_topLengthProfile(v) if e == self.topLengthProfileEntry else self.set_bottomLengthProfile(v)
+            get_sideLength = lambda e: self.topLengthProfile if e == self.topLengthProfileEntry else self.bottomLengthProfile
+            if entry.get_text():
+                if value > self.max_length:
+                    set_sideLength(entry,self.max_length)
+                    entry.set_text('%.2f'%self.max_length)
+                elif value < self.min_length:
+                    set_sideLength(entry,self.min_length)
+                    entry.set_text('%.2f'%self.min_length)    
+                else:
+                    set_sideLength(entry,value)
+            else:
+                entry.set_text('%.2f'%get_sideLength(entry))
+
+        if self.focusTopLengthProfile == True:
+            self.bottomLengthProfile = self.topLengthProfile - self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
+            self.bottomLengthProfileEntry.set_text('%.2f'%self.bottomLengthProfile)
+        elif self.focusBottomLengthProfile == True:
+            self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
+            self.topLengthProfileEntry.set_text('%.2f'%self.topLengthProfile)            
