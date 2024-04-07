@@ -104,6 +104,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                  init_value=self.lefTipAngle                                                                                     
                                                  )
         self.leftAngleProfileEntry.set_name('entryWithNumpadManualWidget')
+        self.leftAngleProfileEntry.set_can_focus(False)
         self.leftAngleProfileEntry.set_max_length(7)
         self.leftAngleProfileEntry.set_alignment(xalign=0.5)
         self.leftAngleProfileEntry.set_halign(Gtk.Align.START)
@@ -134,6 +135,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                   init_value=self.rightTipAngle                                                  
                                                   )                                               
         self.rightAngleProfileEntry.set_name('entryWithNumpadManualWidget')
+        self.rightAngleProfileEntry.set_can_focus(False)
         self.rightAngleProfileEntry.set_max_length(7)
         self.rightAngleProfileEntry.set_alignment(xalign=0.5)
         self.rightAngleProfileEntry.set_halign(Gtk.Align.END)

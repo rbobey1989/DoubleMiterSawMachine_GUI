@@ -111,7 +111,7 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         num_decimal_digits : int = 2,    
         init_value: float = 0     
         ):
-        super(EntryNumpad,self).__init__(can_focus=False) 
+        super(EntryNumpad,self).__init__() 
 
         self.parent = parent
         self.label = label
