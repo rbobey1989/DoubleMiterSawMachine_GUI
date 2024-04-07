@@ -11,7 +11,7 @@ class BubbleNumpad(Gtk.Overlay):
         h_align : Gtk.ArrowType,
         v_align : Gtk.ArrowType
         ):
-        Gtk.Overlay.__init__(self)
+        super(BubbleNumpad,self).__init__(can_focus=False)
 
         css_provider = Gtk.CssProvider()
         css_provider.load_from_path('css_styles_sheets/bubbleNumpadstyle.css')
@@ -20,29 +20,26 @@ class BubbleNumpad(Gtk.Overlay):
         self.par = parent
         self.label = label
         self.h_align = h_align
-        self.v_align = v_align
+        self.v_align = v_align 
 
-        label = [('1','2','3'),
+        self.char = [('1','2','3'),
                  ('4','5','6'),
                  ('7','8','9'),
                  ('.','0','←')]
         
-        drawingArea = Gtk.DrawingArea()
+        drawingArea = Gtk.DrawingArea(can_focus=False)
         self.add_overlay(drawingArea)
-        
-
-        self.grid = Gtk.Grid(name='bubbleNumpadGrid')
-
-        for i,row in enumerate(label):
-            for j,col in enumerate(row):
-                button = Gtk.Button(label=col,expand=True,name='bubbleNumpadButton')
-                self.grid.attach(button,j,i,1,1) 
-                button.connect('button-press-event',self.on_button_press_event_button) 
-                           
-        self.add_overlay(self.grid)
-
         drawingArea.connect("draw", self.on_draw)
-        self.connect('focus-out-event',self.on_focus_out_event)
+
+        self.grid = Gtk.Grid(name='bubbleNumpadGrid',can_focus=False,row_homogeneous=True,column_homogeneous=True)
+
+        for i,row in enumerate(self.char):
+            for j,col in enumerate(row):
+                button = Gtk.Button(label=col,expand=True,can_focus=False,name='bubbleNumpadButton')
+                self.grid.attach(button,j,i,1,1) 
+                button.connect("clicked", self.on_button_clicked_event)
+
+        self.add_overlay(self.grid)
 
     def get_parent(self):
         return self.par
@@ -56,16 +53,13 @@ class BubbleNumpad(Gtk.Overlay):
     def get_label(self):
         return self.label
 
-    def on_button_press_event_button(self, widget, event):
+    def on_button_clicked_event(self, widget):
         widget = widget.get_child() 
         if widget.get_label() != '←':
             self.par.set_text(self.par.get_text() + widget.get_label())
         else:
-            self.par.set_text(self.par.get_text()[:-1])        
-
-    def on_focus_out_event(self, widget, event):
-        self.par.emit('hide-numpad')
-
+            self.par.set_text(self.par.get_text()[:-1]) 
+ 
     def on_draw(self, widget, ctx):
 
         WIDTH = widget.get_allocated_width()
@@ -103,15 +97,10 @@ class BubbleNumpad(Gtk.Overlay):
         self.grid.set_margin_left(H_ALIGN_MARGINS[self.h_align][0])
         self.grid.set_margin_top(Y_OFFSET+BUTTON_OFFSET)
         self.grid.set_margin_right(H_ALIGN_MARGINS[self.h_align][1])
-        self.grid.set_margin_bottom(Y_OFFSET+BUTTON_OFFSET)
+        self.grid.set_margin_bottom(Y_OFFSET+BUTTON_OFFSET)       
 
 
-
-class EntryNumpad(Gtk.Entry,Gtk.Editable):
-    __gsignals__ = {
-        'show-numpad': (GObject.SignalFlags.RUN_FIRST, None, ()),
-        'hide-numpad': (GObject.SignalFlags.RUN_FIRST, None, ()),
-    }
+class EntryNumpad(Gtk.Entry,Gtk.Editable):  
     def __init__(
         self,
         parent,
@@ -122,7 +111,7 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         num_decimal_digits : int = 2,    
         init_value: float = 0     
         ):
-        super(EntryNumpad,self).__init__() 
+        super(EntryNumpad,self).__init__(can_focus=False) 
 
         self.parent = parent
         self.label = label
@@ -136,20 +125,16 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
         self.bubbleNumpad = BubbleNumpad(self,self.label+'BubbleNumpad',self.h_align_bubbleNumpad,self.v_align_bubbleNumpad)
         
-        self.state = 0
+        self.bubbleNumpadVisible = False 
 
-        self.connect('show-numpad', self.show_numpad)
-        self.connect('hide-numpad', self.hide_numpad) 
-
+        self.connect('focus-in-event',self.show_numpad)
+        self.connect('focus-out-event',self.hide_numpad)
+    
     def get_parent(self):
         return self.parent
     
     def get_label(self):
-        return self.label
-
-    def do_focus_in_event(self, event):
-        self.emit('show-numpad')
-        return Gtk.Entry.do_focus_in_event(self, event)
+        return self.label   
 
     def get_child_widget_by_name(self,overlay):
         for widget in overlay.get_children():
@@ -157,21 +142,23 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
                 return widget
         return None  
 
-    def show_numpad(self, widget):
-        if self.get_child_widget_by_name(self.parent) == None:
-            self.parent.add_overlay(self.bubbleNumpad) 
-        self.bubbleNumpad.show_all()
-        self.bubbleNumpad.grab_focus()           
-
-    def hide_numpad(self, widget):
-        if self.get_text():
-            value = float(self.get_text())
-            self.set_text('%.2f'%value)
-            self.parent.emit('update-value', self, value)
-        else:
-            print('empty string')
-            self.parent.emit('update-value', self, 0)        
-        self.bubbleNumpad.hide()      
+    def show_numpad(self, widget, event):
+        if not self.bubbleNumpadVisible:
+            if self.get_child_widget_by_name(self.parent) == None:
+                self.parent.add_overlay(self.bubbleNumpad) 
+            self.bubbleNumpad.show_all()   
+            self.bubbleNumpadVisible = True
+          
+    def hide_numpad(self, widget, event):
+        if self.bubbleNumpadVisible:
+            if self.get_text():
+                value = float(self.get_text())
+                self.set_text('%.2f'%value)
+            else:
+                print('empty string')
+            self.parent.emit('update-value', self, value)       
+            self.bubbleNumpad.hide()   
+            self.bubbleNumpadVisible = False 
 
     def validate_float_string(self,input_string):
         pattern = r"^([1-9]\d{{0,{}}}|0)(\.|\.\d{{1,{}}})?$".format(self.num_int_digits,self.num_decimal_digits)

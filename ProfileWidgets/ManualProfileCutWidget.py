@@ -100,7 +100,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                  h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
                                                  v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                  num_int_digits=3,
-                                                 num_decimal_digits=2,
+                                                 num_decimal_digits=1,
                                                  init_value=self.lefTipAngle                                                                                     
                                                  )
         self.leftAngleProfileEntry.set_name('entryWithNumpadManualWidget')
@@ -130,7 +130,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                   h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                   v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                   num_int_digits=3,
-                                                  num_decimal_digits=2,
+                                                  num_decimal_digits=1,
                                                   init_value=self.rightTipAngle                                                  
                                                   )                                               
         self.rightAngleProfileEntry.set_name('entryWithNumpadManualWidget')
@@ -143,14 +143,22 @@ class ManualProfileCutWidget(Gtk.Overlay):
     def set_lefTipAngle(self,angle):
         self.lefTipAngle = angle        
 
+    def get_leftAngleProfileEntry(self):
+        return self.leftAngleProfileEntry
+
     def set_rightTipAngle(self,angle):
         self.rightTipAngle = angle  
+
+    def get_rightAngleProfileEntry(self):
+        return self.rightAngleProfileEntry
 
     def set_topLengthProfile(self,length):
         self.topLengthProfile = length        
 
     def set_bottomLengthProfile(self,length):
         self.bottomLengthProfile = length   
+
+
 
     def on_draw(self, widget, ctx):        
 
@@ -170,6 +178,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
         css = str("""
         #entryWithNumpadManualWidget {
             font-size: """+ str(int(PADDING_LINE*0.8)) +"""px;
+            background-color: white;
+            caret-color:      white;
+            border-width:     4px;
             box-shadow: 5px 5px 5px 5px rgba(0, 0, 0, 0.5);
             border-radius: 5px;
         }
@@ -180,7 +191,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE)) 
         self.topLengthProfileEntry.set_margin_top(PADDING_LINE-self.topLengthProfileEntry.get_allocated_height()/2)
 
-        self.leftAngleProfileEntry.set_size_request(width=LENGTH_WIDTH*3/5,height=int(PADDING_LINE)) 
+        self.leftAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
         self.leftAngleProfileEntry.set_margin_left(PADDING_LINE/2)
 
         self.bottomLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE))
@@ -364,6 +375,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         else:
             return False
         
+        
     def on_update_value(self,widget,entry, value):
         if entry == self.leftAngleProfileEntry or entry == self.rightAngleProfileEntry:
             set_tipAngle = lambda e,v: self.set_lefTipAngle(v) if e == self.leftAngleProfileEntry else self.set_rightTipAngle(v)
@@ -371,14 +383,14 @@ class ManualProfileCutWidget(Gtk.Overlay):
             if entry.get_text():
                 if value > self.max_angle: 
                     set_tipAngle(entry,self.max_angle)
-                    entry.set_text('%.2f'%self.max_angle)
+                    entry.set_text('%.1f'%self.max_angle)
                 elif value < self.min_angle:
                     set_tipAngle(entry,self.min_angle)                
-                    entry.set_text('%.2f'%self.min_angle)
+                    entry.set_text('%.1f'%self.min_angle)
                 else: 
                     set_tipAngle(entry,value)
             else:
-                entry.set_text('%.2f'%get_tipAngle(entry))   
+                entry.set_text('%.1f'%get_tipAngle(entry))   
         elif entry == self.topLengthProfileEntry or entry == self.bottomLengthProfileEntry:            
             set_sideLength = lambda e,v: self.set_topLengthProfile(v) if e == self.topLengthProfileEntry else self.set_bottomLengthProfile(v)
             get_sideLength = lambda e: self.topLengthProfile if e == self.topLengthProfileEntry else self.bottomLengthProfile
@@ -399,4 +411,6 @@ class ManualProfileCutWidget(Gtk.Overlay):
             self.bottomLengthProfileEntry.set_text('%.2f'%self.bottomLengthProfile)
         elif self.focusBottomLengthProfile == True:
             self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
-            self.topLengthProfileEntry.set_text('%.2f'%self.topLengthProfile)            
+            self.topLengthProfileEntry.set_text('%.2f'%self.topLengthProfile) 
+
+        self.queue_draw()           

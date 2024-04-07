@@ -20,6 +20,7 @@ class MyWindow(Gtk.Window):
         # self.fullscreen()
         self.set_border_width(0)
 
+
         css_provider = Gtk.CssProvider()
         css_provider.load_from_path('css_styles_sheets/style.css')
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -314,19 +315,25 @@ class MyWindow(Gtk.Window):
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
             child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.svg") 
         elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/left_head_angle_variable_icon_pressed.png")       
+            child.set_from_file(filename="icons/left_head_angle_variable_icon_pressed.svg")       
 
     def on_angleLeftHeadManual_btn_released(self,widget,event): 
         child = widget.get_child() 
+        self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(False)
         angleHeadManualState = {'90':0,'45':1,'angle':2}
         if self.angleLeftHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/left_head_angle_45_icon.svg")
+            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%45)
+            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 45)            
             self.angleLeftHeadManualState = angleHeadManualState['45']
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/left_head_angle_variable_icon.png") 
+            child.set_from_file(filename="icons/left_head_angle_variable_icon.svg") 
+            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(True)
             self.angleLeftHeadManualState = angleHeadManualState['angle'] 
         elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/left_head_angle_90_icon.png")
+            child.set_from_file(filename="icons/left_head_angle_90_icon.svg")
+            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%90)
+            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 90)
             self.angleLeftHeadManualState = angleHeadManualState['90'] 
 
     def on_angleRightHeadManual_btn_pressed(self,widget,event):
@@ -334,23 +341,29 @@ class MyWindow(Gtk.Window):
         angleHeadManualState = {'90':0,'45':1,'angle':2}
         child = widget.get_child()
         if self.angleRightHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/right_head_angle_90_icon_pressed.png")
+            child.set_from_file(filename="icons/right_head_angle_90_icon_pressed.svg")
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
             child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.svg") 
         elif self.angleRightHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/right_head_angle_variable_icon_pressed.png")              
+            child.set_from_file(filename="icons/right_head_angle_variable_icon_pressed.svg")              
 
     def on_angleRightHeadManual_btn_released(self,widget,event): 
-        child = widget.get_child() 
+        child = widget.get_child()
+        self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(False) 
         angleHeadManualState = {'90':0,'45':1,'angle':2}
         if self.angleRightHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/right_head_angle_45_icon.svg")
+            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%45)
+            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 45)             
             self.angleRightHeadManualState = angleHeadManualState['45']
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/right_head_angle_variable_icon.png") 
+            child.set_from_file(filename="icons/right_head_angle_variable_icon.svg") 
+            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(True)
             self.angleRightHeadManualState = angleHeadManualState['angle'] 
         elif self.angleRightHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/right_head_angle_90_icon.png")
+            child.set_from_file(filename="icons/right_head_angle_90_icon.svg")
+            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%90)
+            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 90)            
             self.angleRightHeadManualState = angleHeadManualState['90']
 
 
