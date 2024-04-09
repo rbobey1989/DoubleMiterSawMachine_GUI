@@ -31,11 +31,11 @@ class BubbleNumpad(Gtk.Overlay):
         self.add_overlay(drawingArea)
         drawingArea.connect("draw", self.on_draw)
 
-        self.grid = Gtk.Grid(name='bubbleNumpadGrid',can_focus=False,row_homogeneous=True,column_homogeneous=True)
+        self.grid = Gtk.Grid(name='bubbleNumpadGrid')
 
         for i,row in enumerate(self.char):
             for j,col in enumerate(row):
-                button = Gtk.Button(label=col,expand=True,can_focus=False,name='bubbleNumpadButton')
+                button = Gtk.Button(label=col,expand=True,can_focus=False, name='bubbleNumpadButton')
                 self.grid.attach(button,j,i,1,1) 
                 button.connect("clicked", self.on_button_clicked_event)
 
@@ -48,7 +48,9 @@ class BubbleNumpad(Gtk.Overlay):
         return self.h_align 
 
     def get_v_align(self):
-        return self.v_align  
+        return self.v_align 
+
+
     
     def get_label(self):
         return self.label
@@ -106,17 +108,17 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         parent,
         label : str,
         h_align_bubbleNumpad : Gtk.ArrowType,
-        v_align_bubbleNumpad : Gtk.ArrowType,  
+        v_align_bubbleNumpad : Gtk.ArrowType,
         num_int_digits : int = 4,
         num_decimal_digits : int = 2,    
-        init_value: float = 0     
+        init_value: float = 0    
         ):
         super(EntryNumpad,self).__init__() 
 
         self.parent = parent
         self.label = label
         self.h_align_bubbleNumpad = h_align_bubbleNumpad
-        self.v_align_bubbleNumpad = v_align_bubbleNumpad        
+        self.v_align_bubbleNumpad = v_align_bubbleNumpad      
         self.num_int_digits = num_int_digits - 1
         self.num_decimal_digits = num_decimal_digits
         self.init_value = init_value
@@ -144,21 +146,23 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
     def show_numpad(self, widget, event):
         if not self.bubbleNumpadVisible:
+            self.bubbleNumpadVisible = True
             if self.get_child_widget_by_name(self.parent) == None:
                 self.parent.add_overlay(self.bubbleNumpad) 
             self.bubbleNumpad.show_all()   
-            self.bubbleNumpadVisible = True
+            
           
     def hide_numpad(self, widget, event):
         if self.bubbleNumpadVisible:
+            self.bubbleNumpadVisible = False 
             if self.get_text():
                 value = float(self.get_text())
                 self.set_text('%.2f'%value)
             else:
-                print('empty string')
+                value = 0
             self.parent.emit('update-value', self, value)       
             self.bubbleNumpad.hide()   
-            self.bubbleNumpadVisible = False 
+            
 
     def validate_float_string(self,input_string):
         pattern = r"^([1-9]\d{{0,{}}}|0)(\.|\.\d{{1,{}}})?$".format(self.num_int_digits,self.num_decimal_digits)

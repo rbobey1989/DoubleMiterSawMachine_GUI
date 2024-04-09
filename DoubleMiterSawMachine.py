@@ -15,8 +15,9 @@ torneiroLogoHeight = 150
 
 class MyWindow(Gtk.Window):
     def __init__(self):
-        super().__init__(decorated=True)
+        super().__init__()
         self.set_default_size(windowWidth,windowHeight)
+        # self.set_decorated(False)
         # self.fullscreen()
         self.set_border_width(0)
 
@@ -28,7 +29,7 @@ class MyWindow(Gtk.Window):
         self.angleRightHeadManualState = 0
         self.angleLeftHeadManualState = 0
 
-        torneiroLogo = Gtk.Image.new_from_file(filename="images/torneiro_logo.png") 
+        torneiroLogo = Gtk.Image().new_from_file(filename="images/torneiro_logo.png") 
 
         self.ioStatusBtn = Gtk.EventBox(can_focus=True)         
         self.ioStatusBtn.add(Gtk.Image.new_from_file(filename="icons/in_out_icon.png")) 
@@ -61,12 +62,11 @@ class MyWindow(Gtk.Window):
         hBoxHeader.pack_start(hBoxLogoHeader,False,False,0)
         hBoxHeader.pack_end(hBoxBtnsHeader,False,False,0)
 
+
         vBoxMainStruct.pack_start(hBoxHeader,False,True,0)  
 
-        self.notebookPages = Gtk.Notebook(name='notebookPages',show_tabs=False,show_border=False,can_focus=True)
-        self.notebookPages.set_events(
-            self.notebookPages.get_events()|
-            Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.notebookPages = Gtk.Notebook(name='notebookPages',show_tabs=False,show_border=False)
+
         self.pages = {'main':0,'manual':1,'auto':2,'stepSlide':3,
                      'ioState':4,'alarms':5,'settings':6}
 
@@ -125,8 +125,7 @@ class MyWindow(Gtk.Window):
         self.settingsBtn.connect('button-press-event',self.on_settings_btn_pressed)
         self.settingsBtn.connect('button-release-event',self.on_settings_btn_released)  
 
-        self.notebookPages.connect('switch-page',self.on_switch_page)
-        self.notebookPages.connect('button-press-event',self.on_notebook_pages_pressed)                   
+        self.notebookPages.connect('switch-page',self.on_switch_page)                 
 
         self.exitBtn.connect('button-press-event',self.on_exit_btn_pressed)
         self.exitBtn.connect('button-release-event',self.on_exit_btn_released)
@@ -185,17 +184,13 @@ class MyWindow(Gtk.Window):
  
         self.notebookPages.append_page(gridAutoPage)
 
-
         #Build Slide Cutting Page        
 
         gridStepSlidePage = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)        
         gridStepSlidePage.add(Gtk.Label(label="Logo"))
         gridStepSlidePage.attach(Gtk.Label(label="Step and Slide Cutting Page!."),1,1,1,1)
 
-
         self.notebookPages.append_page(gridStepSlidePage)
-
-      
 
         #Build Auto Cutting Page
 
@@ -374,12 +369,7 @@ class MyWindow(Gtk.Window):
             else:
                 self.notebookFooter.set_current_page(0)
 
-    def on_notebook_pages_pressed(self, widget, event):
-        if event.get_button()[1] == 1:
-            widget.grab_focus()
-
     def on_exit_btn_pressed(self,widget,event):
-        widget.grab_focus()
         child = widget.get_child()
         child.set_from_file(filename="icons/exit_icon_pressed.png")  
 

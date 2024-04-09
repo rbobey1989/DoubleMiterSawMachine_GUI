@@ -28,7 +28,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         min_angle: float = 22.5,
         max_angle: float = 157.5    
         ):
-        super(ManualProfileCutWidget, self).__init__(can_focus=True, focus_on_click=True) 
+        super(ManualProfileCutWidget, self).__init__() 
 
         self.par = parent
         self.height_prof   = height_prof  
@@ -62,7 +62,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         )       
         
 
-        drawingArea = Gtk.DrawingArea(can_focus=True,focus_on_click=True)
+        drawingArea = Gtk.DrawingArea(can_focus=True)
         drawingArea.set_name('manualCutProfileWidgetAnimation')
 
         drawingArea.set_events(
@@ -70,9 +70,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
             Gdk.EventMask.BUTTON_PRESS_MASK
             )
 
-        drawingArea.connect("draw", self.on_draw)
-        drawingArea.connect("focus-out-event",self.on_focus_out_event)
-        drawingArea.connect("focus-in-event",self.on_focus_in_event)        
+        drawingArea.connect("draw", self.on_draw)      
         drawingArea.connect("button-press-event", self.on_button_press)
 
         self.add_overlay(drawingArea) 
@@ -140,7 +138,62 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.rightAngleProfileEntry.set_alignment(xalign=0.5)
         self.rightAngleProfileEntry.set_halign(Gtk.Align.END)
         self.rightAngleProfileEntry.set_valign(Gtk.Align.CENTER)
-        self.add_overlay(self.rightAngleProfileEntry)       
+        self.add_overlay(self.rightAngleProfileEntry)     
+
+        self.HeightProfileEntry = EntryNumpad(self,
+                                                  label='entryHeightProfile',
+                                                  h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
+                                                  v_align_bubbleNumpad=Gtk.ArrowType.UP,
+                                                  num_int_digits=3,
+                                                  num_decimal_digits=2,
+                                                  init_value=self.rightTipAngle                                                  
+                                                  )                                               
+        self.HeightProfileEntry.set_name('entryWithNumpadManualWidget')
+        self.HeightProfileEntry.set_can_focus(True)
+        self.HeightProfileEntry.set_max_length(7)
+        self.HeightProfileEntry.set_alignment(xalign=0.5)
+        self.HeightProfileEntry.set_halign(Gtk.Align.START)
+        self.HeightProfileEntry.set_valign(Gtk.Align.END)
+        self.add_overlay(self.HeightProfileEntry) 
+
+        self.gridNumCutsTimeOutDisk = Gtk.Grid()
+        self.gridNumCutsTimeOutDisk.set_halign(Gtk.Align.END)
+        self.gridNumCutsTimeOutDisk.set_valign(Gtk.Align.END) 
+
+        self.NumberOfCutsEntry = EntryNumpad(self,
+                                                  label='entryNumberOfCuts',
+                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
+                                                  v_align_bubbleNumpad=Gtk.ArrowType.UP,
+                                                  num_int_digits=3,
+                                                  num_decimal_digits=1,
+                                                  init_value=self.rightTipAngle                                                  
+                                                  )                                               
+        self.NumberOfCutsEntry.set_name('entryWithNumpadManualWidget')
+        self.NumberOfCutsEntry.set_can_focus(True)
+        self.NumberOfCutsEntry.set_max_length(7)
+        self.NumberOfCutsEntry.set_alignment(xalign=0.5)
+        self.NumberOfCutsEntry.set_halign(Gtk.Align.END)
+        self.NumberOfCutsEntry.set_valign(Gtk.Align.END) 
+
+        self.gridNumCutsTimeOutDisk.add(self.NumberOfCutsEntry)
+
+        self.TimeOutDiskEntry = EntryNumpad(self,
+                                                  label='entryTimeOutDisk',
+                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
+                                                  v_align_bubbleNumpad=Gtk.ArrowType.UP,
+                                                  num_int_digits=3,
+                                                  num_decimal_digits=1,
+                                                  init_value=self.rightTipAngle                                                                                             
+                                                  )                                               
+        self.TimeOutDiskEntry.set_name('entryWithNumpadManualWidget')
+        self.TimeOutDiskEntry.set_can_focus(True)
+        self.TimeOutDiskEntry.set_max_length(7)
+        self.TimeOutDiskEntry.set_alignment(xalign=0.5)
+        self.TimeOutDiskEntry.set_halign(Gtk.Align.END)
+        self.TimeOutDiskEntry.set_valign(Gtk.Align.END)
+
+        self.gridNumCutsTimeOutDisk.attach_next_to(self.TimeOutDiskEntry,self.NumberOfCutsEntry,Gtk.PositionType.BOTTOM,1,1)
+        self.add_overlay(self.gridNumCutsTimeOutDisk)
         
     def set_lefTipAngle(self,angle):
         self.lefTipAngle = angle        
@@ -159,8 +212,6 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
     def set_bottomLengthProfile(self,length):
         self.bottomLengthProfile = length   
-
-
 
     def on_draw(self, widget, ctx):        
 
@@ -202,8 +253,22 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.rightAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
         self.rightAngleProfileEntry.set_margin_right(PADDING_LINE/2)
 
+        self.HeightProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
+        self.HeightProfileEntry.set_margin_left(PADDING_LINE/2)
+        self.HeightProfileEntry.set_margin_bottom(PADDING_LINE-self.HeightProfileEntry.get_allocated_height()/2)       
 
-        ctx.set_source_rgb(0.99, 0.64, 0.07)
+        self.NumberOfCutsEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE))
+        self.TimeOutDiskEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE))
+        row_space = (HEIGHT/2 - PADDING_LINE - 
+                    self.NumberOfCutsEntry.get_allocated_height()/2 -
+                    self.TimeOutDiskEntry.get_allocated_height() -
+                    self.rightAngleProfileEntry.get_allocated_height()/2)/2
+        self.gridNumCutsTimeOutDisk.set_row_spacing(row_space) 
+        self.gridNumCutsTimeOutDisk.set_margin_right(PADDING_LINE/2)
+        self.gridNumCutsTimeOutDisk.set_margin_bottom( PADDING_LINE/2)    
+
+
+        ctx.set_source_rgb(0.23, 0.61, 0.84)
         ctx.set_line_width(10)  
         ctx.set_line_cap(cairo.LINE_CAP_ROUND)
         ctx.set_line_join(cairo.LINE_JOIN_ROUND)   
@@ -233,7 +298,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         ctx.close_path()      
         ctx.fill_preserve()
-        ctx.set_source_rgb(1.0, 0.2, 0.5)
+        ctx.set_source_rgb(0.06, 0.10, 0.29)
         ctx.stroke()
 
         if self.focusTopLengthProfile:
@@ -244,10 +309,10 @@ class ManualProfileCutWidget(Gtk.Overlay):
             ctx.line_to(WIDTH/2  + WIDTH_ARROW/2, HEIGHT/2)
             ctx.line_to(WIDTH/2  + WIDTH_ARROW/4, HEIGHT/2)
             ctx.line_to(WIDTH/2  + WIDTH_ARROW/4, HEIGHT/2 + HEIGHT_ARROW/2)
-            ctx.set_source_rgb(0.6, 0.3, 0.7)
+            ctx.set_source_rgb(0.96, 1.00, 0.97)
             ctx.close_path()
             ctx.fill_preserve()
-            ctx.set_source_rgb(1.0, 0.2, 0.5)
+            ctx.set_source_rgb(0.42, 0.46, 0.49)
             ctx.stroke()   
 
         if self.focusBottomLengthProfile:
@@ -258,10 +323,10 @@ class ManualProfileCutWidget(Gtk.Overlay):
             ctx.line_to(WIDTH/2  + WIDTH_ARROW/2, HEIGHT/2)
             ctx.line_to(WIDTH/2  + WIDTH_ARROW/4, HEIGHT/2)
             ctx.line_to(WIDTH/2  + WIDTH_ARROW/4, HEIGHT/2 - HEIGHT_ARROW/2)
-            ctx.set_source_rgb(0.6, 0.3, 0.7)
+            ctx.set_source_rgb(0.96, 1.00, 0.97)
             ctx.close_path()
             ctx.fill_preserve()
-            ctx.set_source_rgb(1.0, 0.2, 0.5)
+            ctx.set_source_rgb(0.42, 0.46, 0.49)
             ctx.stroke()              
 
         if self.lefTipAngle <= 90:
@@ -300,16 +365,11 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         ctx.line_to(WIDTH/2 + LENGTH_WIDTH/2,  HEIGHT - PADDING_LINE)
 
-        ctx.set_line_width(2)
+        ctx.set_source_rgb(0.96, 1.00, 0.97)
+        ctx.set_line_width(4)
         ctx.set_dash([14,6])
         
-        ctx.stroke()                   
-
-    def on_focus_out_event(self,widget,event):
-        pass
-
-    def on_focus_in_event(self,widget,event):
-        pass        
+        ctx.stroke()                         
 
     def on_button_press(self, widget, event):
 
@@ -342,11 +402,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
         HEIGHT_BUBBLE_NUMPAD = height*self.height_bubble_numpad 
         WIDTH_BUBBLE_NUMPAD = width*self.width_bubble_numpad
         PADDING_LINE = height*self.padding_line
-        LENGTH_WIDTH = width*self.length_width  
+        LENGTH_WIDTH = width*self.length_width 
 
         if isinstance(widget, BubbleNumpad):  
-
-
             if widget.get_parent().get_halign() == Gtk.Align.START:
                 if widget.get_h_align() == Gtk.ArrowType.RIGHT:
                     allocation.x = PADDING_LINE/2 + LENGTH_WIDTH/2                
@@ -368,9 +426,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
                 if widget.get_v_align() == Gtk.ArrowType.DOWN:
                     allocation.y = HEIGHT/2
             elif widget.get_parent().get_valign() == Gtk.Align.END:
-                if widget.get_v_align() == Gtk.ArrowType.UP:
+                if widget.get_v_align() == Gtk.ArrowType.UP:                    
                     allocation.y = HEIGHT - PADDING_LINE - HEIGHT_BUBBLE_NUMPAD
-
             allocation.width = WIDTH_BUBBLE_NUMPAD
             allocation.height = HEIGHT_BUBBLE_NUMPAD 
             return True
