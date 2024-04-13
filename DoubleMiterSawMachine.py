@@ -62,7 +62,6 @@ class MyWindow(Gtk.Window):
         hBoxHeader.pack_start(hBoxLogoHeader,False,False,0)
         hBoxHeader.pack_end(hBoxBtnsHeader,False,False,0)
 
-
         vBoxMainStruct.pack_start(hBoxHeader,False,True,0)  
 
         self.notebookPages = Gtk.Notebook(name='notebookPages',show_tabs=False,show_border=False)

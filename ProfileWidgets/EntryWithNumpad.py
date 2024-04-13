@@ -3,6 +3,14 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, Gdk, GObject
 import re,cairo
 
+
+class myAlign(GObject.GEnum):
+    START = 0
+    CENTER = 1
+    END = 2
+    MIDDLE_START = 3
+    MIDDLE_END = 4
+
 class BubbleNumpad(Gtk.Overlay):
     def __init__(
         self,
@@ -107,6 +115,8 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         self,
         parent,
         label : str,
+        h_align_entry : myAlign,
+        v_align_entry : myAlign,
         h_align_bubbleNumpad : Gtk.ArrowType,
         v_align_bubbleNumpad : Gtk.ArrowType,
         num_int_digits : int = 4,
@@ -117,13 +127,15 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
         self.parent = parent
         self.label = label
+        self.h_align_entry = h_align_entry
+        self.v_align_entry = v_align_entry
         self.h_align_bubbleNumpad = h_align_bubbleNumpad
         self.v_align_bubbleNumpad = v_align_bubbleNumpad      
         self.num_int_digits = num_int_digits - 1
         self.num_decimal_digits = num_decimal_digits
         self.init_value = init_value
 
-        self.set_text('%.2f'%self.init_value)
+        self.set_text('%.*f'%(self.num_decimal_digits,self.init_value))
 
         self.bubbleNumpad = BubbleNumpad(self,self.label+'BubbleNumpad',self.h_align_bubbleNumpad,self.v_align_bubbleNumpad)
         
@@ -136,7 +148,16 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
         return self.parent
     
     def get_label(self):
-        return self.label   
+        return self.label  
+
+    def get_h_align_entry(self):
+        return self.h_align_entry 
+    
+    def get_v_align_entry(self):
+        return self.v_align_entry 
+    
+    def get_num_decimal_digits(self):
+        return self.num_decimal_digits
 
     def get_child_widget_by_name(self,overlay):
         for widget in overlay.get_children():
@@ -157,7 +178,7 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
             self.bubbleNumpadVisible = False 
             if self.get_text():
                 value = float(self.get_text())
-                self.set_text('%.2f'%value)
+                self.set_text('%.*f'%(self.num_decimal_digits,value))
             else:
                 value = 0
             self.parent.emit('update-value', self, value)       
@@ -165,7 +186,10 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
             
 
     def validate_float_string(self,input_string):
-        pattern = r"^([1-9]\d{{0,{}}}|0)(\.|\.\d{{1,{}}})?$".format(self.num_int_digits,self.num_decimal_digits)
+        if self.num_decimal_digits != 0:
+            pattern = r"^([1-9]\d{{0,{}}}|0)(\.|\.\d{{1,{}}})?$".format(self.num_int_digits,self.num_decimal_digits)
+        else:
+            pattern = r"^([1-9]\d{{0,{}}}|0)?$".format(self.num_int_digits)
         return re.match(pattern, input_string)    
 
     def do_insert_text(self, new_text, length, position):
@@ -178,3 +202,4 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
 
         self.get_buffer().insert_text(position, new_text[:-1], length-1)
         return position
+

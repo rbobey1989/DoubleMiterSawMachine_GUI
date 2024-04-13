@@ -6,6 +6,9 @@ from gi.repository import Gtk, Gdk, GObject
 import cairo,math
 
 from .EntryWithNumpad import EntryNumpad,BubbleNumpad
+from .EntryWithNumpad import myAlign
+
+
 
 class ManualProfileCutWidget(Gtk.Overlay):
     __gsignals__ = {
@@ -76,14 +79,15 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.add_overlay(drawingArea) 
         self.connect('get-child-position',self.on_get_child_position) 
         self.connect('update-value', self.on_update_value)       
-        
 
         self.topLengthProfileEntry = EntryNumpad(self,
                                                  label='entryTopLengths',
+                                                 h_align_entry= myAlign.CENTER,
+                                                 v_align_entry= myAlign.START,
                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                  v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                  num_int_digits=4,
-                                                 num_decimal_digits=2, 
+                                                 num_decimal_digits=1, 
                                                  init_value=self.topLengthProfile                                                
                                                  )
         self.topLengthProfileEntry.set_name('entryWithNumpadManualWidget')
@@ -91,10 +95,20 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfileEntry.set_alignment(xalign=0.5)
         self.topLengthProfileEntry.set_halign(Gtk.Align.CENTER)
         self.topLengthProfileEntry.set_valign(Gtk.Align.START)
+
         self.add_overlay(self.topLengthProfileEntry)
+
+        self.hboxLeftAngleProfile = Gtk.HBox(can_focus=False)
+        self.hboxLeftAngleProfile.set_halign(Gtk.Align.START)
+        self.hboxLeftAngleProfile.set_valign(Gtk.Align.CENTER)
+
+        self.varLeftAngleProfileLabel = Gtk.Label(label='β\u2081',can_focus=False)
+        self.varLeftAngleProfileLabel.set_name('labelIdicatorsEntryWithNumpadManualWidget')        
 
         self.leftAngleProfileEntry = EntryNumpad(self,
                                                  label= 'entryLeftAngle',
+                                                 h_align_entry= myAlign.START,
+                                                 v_align_entry= myAlign.CENTER,                                                 
                                                  h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
                                                  v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                  num_int_digits=3,
@@ -105,16 +119,18 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.leftAngleProfileEntry.set_can_focus(False)
         self.leftAngleProfileEntry.set_max_length(7)
         self.leftAngleProfileEntry.set_alignment(xalign=0.5)
-        self.leftAngleProfileEntry.set_halign(Gtk.Align.START)
-        self.leftAngleProfileEntry.set_valign(Gtk.Align.CENTER)
-        self.add_overlay(self.leftAngleProfileEntry)
+        self.hboxLeftAngleProfile.pack_start(self.varLeftAngleProfileLabel,True,True,0) 
+        self.hboxLeftAngleProfile.pack_start(self.leftAngleProfileEntry,True,True,0)       
+        self.add_overlay(self.hboxLeftAngleProfile)
      
         self.bottomLengthProfileEntry = EntryNumpad(self,
                                                     label='entryBottomLength',
+                                                    h_align_entry= myAlign.CENTER,
+                                                    v_align_entry= myAlign.END,                                                    
                                                     h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
                                                     v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                     num_int_digits=4,
-                                                    num_decimal_digits=2,
+                                                    num_decimal_digits=1,
                                                     init_value=self.bottomLengthProfile
                                                     )                                               
         self.bottomLengthProfileEntry.set_name('entryWithNumpadManualWidget')
@@ -122,10 +138,19 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.bottomLengthProfileEntry.set_alignment(xalign=0.5)
         self.bottomLengthProfileEntry.set_halign(Gtk.Align.CENTER)
         self.bottomLengthProfileEntry.set_valign(Gtk.Align.END)
-        self.add_overlay(self.bottomLengthProfileEntry)   
+        self.add_overlay(self.bottomLengthProfileEntry)  
+
+        self.hboxRightAngleProfile = Gtk.HBox(can_focus=False)
+        self.hboxRightAngleProfile.set_halign(Gtk.Align.END)
+        self.hboxRightAngleProfile.set_valign(Gtk.Align.CENTER)
+
+        self.varRightAngleProfileLabel = Gtk.Label(label='β\u2082',can_focus=False)
+        self.varRightAngleProfileLabel.set_name('labelIdicatorsEntryWithNumpadManualWidget')  
      
         self.rightAngleProfileEntry = EntryNumpad(self,
                                                   label='entryRightAngle',
+                                                  h_align_entry= myAlign.END,
+                                                  v_align_entry= myAlign.CENTER,                                                  
                                                   h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                   v_align_bubbleNumpad=Gtk.ArrowType.DOWN,
                                                   num_int_digits=3,
@@ -136,64 +161,84 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.rightAngleProfileEntry.set_can_focus(False)
         self.rightAngleProfileEntry.set_max_length(7)
         self.rightAngleProfileEntry.set_alignment(xalign=0.5)
-        self.rightAngleProfileEntry.set_halign(Gtk.Align.END)
-        self.rightAngleProfileEntry.set_valign(Gtk.Align.CENTER)
-        self.add_overlay(self.rightAngleProfileEntry)     
+        self.hboxRightAngleProfile.add(self.rightAngleProfileEntry)
+        self.hboxRightAngleProfile.pack_start(self.varRightAngleProfileLabel,True,True,0)
+        self.add_overlay(self.hboxRightAngleProfile)     
+
+        self.hboxHeightProfile = Gtk.HBox(can_focus=False)
+        self.hboxHeightProfile.set_halign(Gtk.Align.START)
+        self.hboxHeightProfile.set_valign(Gtk.Align.END)
+
+        self.varHeightProfileLabel = Gtk.Label(label='h',can_focus=False)
+        self.varHeightProfileLabel.set_name('labelIdicatorsEntryWithNumpadManualWidget')
 
         self.HeightProfileEntry = EntryNumpad(self,
                                                   label='entryHeightProfile',
+                                                  h_align_entry= myAlign.START,
+                                                  v_align_entry= myAlign.END,                                                  
                                                   h_align_bubbleNumpad=Gtk.ArrowType.RIGHT,
                                                   v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                   num_int_digits=3,
-                                                  num_decimal_digits=2,
-                                                  init_value=self.rightTipAngle                                                  
+                                                  num_decimal_digits=1,
+                                                  init_value=self.heightProfile                                                  
                                                   )                                               
         self.HeightProfileEntry.set_name('entryWithNumpadManualWidget')
         self.HeightProfileEntry.set_can_focus(True)
         self.HeightProfileEntry.set_max_length(7)
         self.HeightProfileEntry.set_alignment(xalign=0.5)
-        self.HeightProfileEntry.set_halign(Gtk.Align.START)
-        self.HeightProfileEntry.set_valign(Gtk.Align.END)
-        self.add_overlay(self.HeightProfileEntry) 
+        self.hboxHeightProfile.add(self.varHeightProfileLabel)
+        self.hboxHeightProfile.pack_start(self.HeightProfileEntry,True,True,0)
+        self.add_overlay(self.hboxHeightProfile) 
 
-        self.gridNumCutsTimeOutDisk = Gtk.Grid()
-        self.gridNumCutsTimeOutDisk.set_halign(Gtk.Align.END)
-        self.gridNumCutsTimeOutDisk.set_valign(Gtk.Align.END) 
+        self.hboxNumberOfCuts = Gtk.HBox(can_focus=False)
+        self.hboxNumberOfCuts.set_halign(Gtk.Align.END)
+        self.hboxNumberOfCuts.set_valign(Gtk.Align.END)
+
+        self.varNumberOfCutsLabel = Gtk.Label(label='u',can_focus=False)
+        self.varNumberOfCutsLabel.set_name('labelIdicatorsEntryWithNumpadManualWidget')
 
         self.NumberOfCutsEntry = EntryNumpad(self,
                                                   label='entryNumberOfCuts',
+                                                  h_align_entry= myAlign.END,
+                                                  v_align_entry= myAlign.MIDDLE_END,                                                  
                                                   h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                   v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                   num_int_digits=3,
-                                                  num_decimal_digits=1,
-                                                  init_value=self.rightTipAngle                                                  
+                                                  num_decimal_digits=0,
+                                                  init_value=0                                                
                                                   )                                               
         self.NumberOfCutsEntry.set_name('entryWithNumpadManualWidget')
         self.NumberOfCutsEntry.set_can_focus(True)
         self.NumberOfCutsEntry.set_max_length(7)
         self.NumberOfCutsEntry.set_alignment(xalign=0.5)
-        self.NumberOfCutsEntry.set_halign(Gtk.Align.END)
-        self.NumberOfCutsEntry.set_valign(Gtk.Align.END) 
+        self.hboxNumberOfCuts.add(self.NumberOfCutsEntry)
+        self.hboxNumberOfCuts.pack_start(self.varNumberOfCutsLabel,True,True,0) 
+        self.add_overlay(self.hboxNumberOfCuts)
 
-        self.gridNumCutsTimeOutDisk.add(self.NumberOfCutsEntry)
+        self.hboxTimeOutDisk = Gtk.HBox(can_focus=False)
+        self.hboxTimeOutDisk.set_halign(Gtk.Align.END)
+        self.hboxTimeOutDisk.set_valign(Gtk.Align.END)
+
+        self.varTimeOutDiskLabel = Gtk.Label(label='s',can_focus=False)
+        self.varTimeOutDiskLabel.set_name('labelIdicatorsEntryWithNumpadManualWidget')
 
         self.TimeOutDiskEntry = EntryNumpad(self,
                                                   label='entryTimeOutDisk',
+                                                  h_align_entry= myAlign.END,
+                                                  v_align_entry= myAlign.END,                                                  
                                                   h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
                                                   v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                   num_int_digits=3,
                                                   num_decimal_digits=1,
-                                                  init_value=self.rightTipAngle                                                                                             
+                                                  init_value=0                                                                                            
                                                   )                                               
         self.TimeOutDiskEntry.set_name('entryWithNumpadManualWidget')
         self.TimeOutDiskEntry.set_can_focus(True)
         self.TimeOutDiskEntry.set_max_length(7)
         self.TimeOutDiskEntry.set_alignment(xalign=0.5)
-        self.TimeOutDiskEntry.set_halign(Gtk.Align.END)
-        self.TimeOutDiskEntry.set_valign(Gtk.Align.END)
-
-        self.gridNumCutsTimeOutDisk.attach_next_to(self.TimeOutDiskEntry,self.NumberOfCutsEntry,Gtk.PositionType.BOTTOM,1,1)
-        self.add_overlay(self.gridNumCutsTimeOutDisk)
+        self.hboxTimeOutDisk.add(self.TimeOutDiskEntry)
+        self.hboxTimeOutDisk.pack_start(self.varTimeOutDiskLabel,True,True,0)
+        self.add_overlay(self.hboxTimeOutDisk)
         
     def set_lefTipAngle(self,angle):
         self.lefTipAngle = angle        
@@ -211,7 +256,10 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfile = length        
 
     def set_bottomLengthProfile(self,length):
-        self.bottomLengthProfile = length   
+        self.bottomLengthProfile = length 
+
+    def set_heightProfile(self,length):
+        self.heightProfile = length
 
     def on_draw(self, widget, ctx):        
 
@@ -235,7 +283,13 @@ class ManualProfileCutWidget(Gtk.Overlay):
             caret-color:      white;
             border-width:     4px;
             box-shadow: 5px 5px 5px 5px rgba(0, 0, 0, 0.5);
-            border-radius: 5px;
+            border-radius: 2px;
+        }
+
+        #labelIdicatorsEntryWithNumpadManualWidget {
+            font-size: """+ str(int(PADDING_LINE*0.8)) +"""px;
+            color: white;
+            text-shadow: 2px 2px 4px #000000;
         }
         """).encode()
         self.provider.load_from_data(css) 
@@ -245,27 +299,40 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfileEntry.set_margin_top(PADDING_LINE-self.topLengthProfileEntry.get_allocated_height()/2)
 
         self.leftAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
-        self.leftAngleProfileEntry.set_margin_left(PADDING_LINE/2)
-
+        self.hboxLeftAngleProfile.set_margin_left(2.2*PADDING_LINE - 
+                                                  self.leftAngleProfileEntry.get_allocated_width()/2 - 
+                                                  self.varLeftAngleProfileLabel.get_allocated_width())
+        self.hboxLeftAngleProfile.set_spacing(PADDING_LINE/8)
+        
         self.bottomLengthProfileEntry.set_size_request(width=LENGTH_WIDTH,height=int(PADDING_LINE))
         self.bottomLengthProfileEntry.set_margin_bottom(PADDING_LINE-self.bottomLengthProfileEntry.get_allocated_height()/2)        
 
         self.rightAngleProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
-        self.rightAngleProfileEntry.set_margin_right(PADDING_LINE/2)
+        self.hboxRightAngleProfile.set_margin_right(2.2*PADDING_LINE - 
+                                                    self.rightAngleProfileEntry.get_allocated_width()/2 -
+                                                    self.varRightAngleProfileLabel.get_allocated_width())
+        self.hboxRightAngleProfile.set_spacing(PADDING_LINE/8)
 
         self.HeightProfileEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE)) 
-        self.HeightProfileEntry.set_margin_left(PADDING_LINE/2)
-        self.HeightProfileEntry.set_margin_bottom(PADDING_LINE-self.HeightProfileEntry.get_allocated_height()/2)       
+        self.hboxHeightProfile.set_margin_left(2.2*PADDING_LINE - 
+                                               self.HeightProfileEntry.get_allocated_width()/2 - 
+                                               self.varHeightProfileLabel.get_allocated_width())
+        self.hboxHeightProfile.set_margin_bottom(PADDING_LINE-self.HeightProfileEntry.get_allocated_height()/2)       
+        self.hboxHeightProfile.set_spacing(PADDING_LINE/8)
 
         self.NumberOfCutsEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE))
+        self.hboxNumberOfCuts.set_margin_right(2.2*PADDING_LINE - 
+                                               self.NumberOfCutsEntry.get_allocated_width()/2 -
+                                               self.varNumberOfCutsLabel.get_allocated_width())
+        self.hboxNumberOfCuts.set_margin_bottom(HEIGHT/4 + PADDING_LINE/2-self.NumberOfCutsEntry.get_allocated_height()/2)
+        self.hboxNumberOfCuts.set_spacing(PADDING_LINE/8)
+
         self.TimeOutDiskEntry.set_size_request(width=LENGTH_WIDTH/2,height=int(PADDING_LINE))
-        row_space = (HEIGHT/2 - PADDING_LINE - 
-                    self.NumberOfCutsEntry.get_allocated_height()/2 -
-                    self.TimeOutDiskEntry.get_allocated_height() -
-                    self.rightAngleProfileEntry.get_allocated_height()/2)/2
-        self.gridNumCutsTimeOutDisk.set_row_spacing(row_space) 
-        self.gridNumCutsTimeOutDisk.set_margin_right(PADDING_LINE/2)
-        self.gridNumCutsTimeOutDisk.set_margin_bottom( PADDING_LINE/2)    
+        self.hboxTimeOutDisk.set_margin_right(2.2*PADDING_LINE - 
+                                              self.TimeOutDiskEntry.get_allocated_width()/2 - 
+                                              self.varTimeOutDiskLabel.get_allocated_width())
+        self.hboxTimeOutDisk.set_margin_bottom(PADDING_LINE-self.TimeOutDiskEntry.get_allocated_height()/2)
+        self.hboxTimeOutDisk.set_spacing(PADDING_LINE/8)
 
 
         ctx.set_source_rgb(0.23, 0.61, 0.84)
@@ -403,31 +470,36 @@ class ManualProfileCutWidget(Gtk.Overlay):
         WIDTH_BUBBLE_NUMPAD = width*self.width_bubble_numpad
         PADDING_LINE = height*self.padding_line
         LENGTH_WIDTH = width*self.length_width 
+        Y_OFFSET = height*self.y_offset
+        X_OFFSET = width*self.x_offset
 
         if isinstance(widget, BubbleNumpad):  
-            if widget.get_parent().get_halign() == Gtk.Align.START:
+            if widget.get_parent().get_h_align_entry() == myAlign.START:
                 if widget.get_h_align() == Gtk.ArrowType.RIGHT:
-                    allocation.x = PADDING_LINE/2 + LENGTH_WIDTH/2                
-            elif widget.get_parent().get_halign() == Gtk.Align.CENTER:
+                    allocation.x = PADDING_LINE + LENGTH_WIDTH/2                
+            elif widget.get_parent().get_h_align_entry() == myAlign.CENTER:
                 if widget.get_h_align() == Gtk.ArrowType.RIGHT:
                     allocation.x = WIDTH/2 + LENGTH_WIDTH/2
                 elif widget.get_h_align() == Gtk.ArrowType.LEFT:
                     allocation.x = WIDTH/2 - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD 
-            elif widget.get_parent().get_halign() == Gtk.Align.END:
+            elif widget.get_parent().get_h_align_entry() == myAlign.END:
                 if widget.get_h_align() == Gtk.ArrowType.LEFT:
-                    allocation.x = WIDTH - PADDING_LINE/2 - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD           
+                    allocation.x = WIDTH - PADDING_LINE - LENGTH_WIDTH/2 - WIDTH_BUBBLE_NUMPAD           
 
-            if widget.get_parent().get_valign() == Gtk.Align.START:
+            if widget.get_parent().get_v_align_entry() == myAlign.START:
                 if widget.get_v_align() == Gtk.ArrowType.DOWN:
                     allocation.y = PADDING_LINE
-            elif widget.get_parent().get_valign() == Gtk.Align.CENTER:
+            elif widget.get_parent().get_v_align_entry() == myAlign.CENTER:
                 if widget.get_v_align() == Gtk.ArrowType.UP:
                     allocation.y = HEIGHT/2 - HEIGHT_BUBBLE_NUMPAD
                 if widget.get_v_align() == Gtk.ArrowType.DOWN:
                     allocation.y = HEIGHT/2
-            elif widget.get_parent().get_valign() == Gtk.Align.END:
+            elif widget.get_parent().get_v_align_entry() == myAlign.END:
                 if widget.get_v_align() == Gtk.ArrowType.UP:                    
                     allocation.y = HEIGHT - PADDING_LINE - HEIGHT_BUBBLE_NUMPAD
+            elif widget.get_parent().get_v_align_entry() == myAlign.MIDDLE_END:
+                if widget.get_v_align() == Gtk.ArrowType.UP:                    
+                    allocation.y = HEIGHT - (HEIGHT/4 + PADDING_LINE/2) - HEIGHT_BUBBLE_NUMPAD
             allocation.width = WIDTH_BUBBLE_NUMPAD
             allocation.height = HEIGHT_BUBBLE_NUMPAD 
             return True
@@ -442,34 +514,37 @@ class ManualProfileCutWidget(Gtk.Overlay):
             if entry.get_text():
                 if value > self.max_angle: 
                     set_tipAngle(entry,self.max_angle)
-                    entry.set_text('%.1f'%self.max_angle)
+                    entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.max_angle))
                 elif value < self.min_angle:
                     set_tipAngle(entry,self.min_angle)                
-                    entry.set_text('%.1f'%self.min_angle)
+                    entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.min_angle))
                 else: 
                     set_tipAngle(entry,value)
             else:
-                entry.set_text('%.1f'%get_tipAngle(entry))   
+                entry.set_text('%.*f'%(entry.get_num_decimal_digits(),get_tipAngle(entry)))   
         elif entry == self.topLengthProfileEntry or entry == self.bottomLengthProfileEntry:            
             set_sideLength = lambda e,v: self.set_topLengthProfile(v) if e == self.topLengthProfileEntry else self.set_bottomLengthProfile(v)
             get_sideLength = lambda e: self.topLengthProfile if e == self.topLengthProfileEntry else self.bottomLengthProfile
             if entry.get_text():
                 if value > self.max_length:
                     set_sideLength(entry,self.max_length)
-                    entry.set_text('%.2f'%self.max_length)
+                    entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.max_length))
                 elif value < self.min_length:
                     set_sideLength(entry,self.min_length)
-                    entry.set_text('%.2f'%self.min_length)    
+                    entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.min_length))
                 else:
                     set_sideLength(entry,value)
             else:
-                entry.set_text('%.2f'%get_sideLength(entry))
+                entry.set_text('%.*f'%(entry.get_num_decimal_digits(),get_sideLength(entry)))
+        elif entry == self.HeightProfileEntry:
+            self.set_heightProfile(value)
+            entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.heightProfile))
 
         if self.focusTopLengthProfile == True:
             self.bottomLengthProfile = self.topLengthProfile - self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
-            self.bottomLengthProfileEntry.set_text('%.2f'%self.bottomLengthProfile)
+            self.bottomLengthProfileEntry.set_text('%.*f'%(self.bottomLengthProfileEntry.get_num_decimal_digits(),self.bottomLengthProfile))
         elif self.focusBottomLengthProfile == True:
             self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
-            self.topLengthProfileEntry.set_text('%.2f'%self.topLengthProfile) 
+            self.topLengthProfileEntry.set_text('%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),self.topLengthProfile))
 
         self.queue_draw()           
