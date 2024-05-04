@@ -1,30 +1,42 @@
-import gi
+#!/usr/bin/env python
 
-gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk,Gdk
+import gi
+# gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk,Gdk,GLib
+
+import linuxcnc
+
+from gladevcp.core import Info, Status, Action
+
+import hal
+from hal_glib import GStat
 
 from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget
+from ActionBtnsWidgets.ActionsBtnsWidgets import myBtnEstoptoggleAction,myBtnOnOfftoggleAction,myBtnHomeAxisAction
 
+INFO = Info()
+STATUS = Status()
+ACTION = Action()
+s = linuxcnc.stat()
+c = linuxcnc.command() 
 
-windowHeight = 1080
-windowWidth = 1920
-buttonsWidth = 150
-buttonsHeight = 150
-torneiroLogoWidth = 300
-torneiroLogoHeight = 150
+class DoubleMiterMachine(Gtk.Window):
 
-class MyWindow(Gtk.Window):
-    def __init__(self):
+    def __init__(self,update_rate_gui=100,update_rate_hal=100):
         super().__init__()
-        self.set_default_size(windowWidth,windowHeight)
+        self.set_default_size(1920, 1080)
         # self.set_decorated(False)
         # self.fullscreen()
-        self.set_border_width(0)
-
+        self.set_border_width(0) 
 
         css_provider = Gtk.CssProvider()
         css_provider.load_from_path('css_styles_sheets/style.css')
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+
+        self.hal = hal.component("DoubleMiterMachine")
+        self.update_rate_hal = update_rate_hal
+        self.update_rate_gui = update_rate_gui
 
         self.angleRightHeadManualState = 0
         self.angleLeftHeadManualState = 0
@@ -33,7 +45,6 @@ class MyWindow(Gtk.Window):
 
         self.ioStatusBtn = Gtk.EventBox(can_focus=True)         
         self.ioStatusBtn.add(Gtk.Image.new_from_file(filename="icons/in_out_icon.png")) 
-
 
         self.alarmsBtn = Gtk.EventBox(can_focus=True) 
         self.alarmsBtn.add(Gtk.Image.new_from_file(filename="icons/alarm_icon.png"))         
@@ -52,6 +63,15 @@ class MyWindow(Gtk.Window):
         hBoxLogoHeader = Gtk.HBox()
         hBoxLogoHeader.pack_start(torneiroLogo,False,False,0)
 
+        hBoxSecurityBtns = Gtk.HBox(spacing=50,homogeneous=True,name='securityBtns')
+
+        self.eStopToggleBtn = myBtnEstoptoggleAction()
+
+        self.onOffToggleBtn = myBtnOnOfftoggleAction()                        
+
+        hBoxSecurityBtns.pack_start(self.eStopToggleBtn,False,False,0)
+        hBoxSecurityBtns.pack_end(self.onOffToggleBtn,False,False,0)
+
         hBoxBtnsHeader = Gtk.HBox(spacing=50,homogeneous=True)
 
         hBoxBtnsHeader.pack_start(self.settingsBtn,False,False,0)
@@ -60,6 +80,7 @@ class MyWindow(Gtk.Window):
 
         hBoxHeader = Gtk.HBox(homogeneous=False,name='header')
         hBoxHeader.pack_start(hBoxLogoHeader,False,False,0)
+        hBoxHeader.set_center_widget(hBoxSecurityBtns)
         hBoxHeader.pack_end(hBoxBtnsHeader,False,False,0)
 
         vBoxMainStruct.pack_start(hBoxHeader,False,True,0)  
@@ -89,22 +110,31 @@ class MyWindow(Gtk.Window):
 
         #Build Main Page
 
-        self.manualCuttingBtn = Gtk.EventBox()
+        self.homeAxisBtn = myBtnHomeAxisAction()
+
+        self.gstatModes = GStat()
+
+        self.manualCuttingBtn = Gtk.EventBox(sensitive=False)
         self.manualCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/manual_mode_icon.png"))                 
 
-        self.autoCuttingBtn = Gtk.EventBox()
+        self.autoCuttingBtn = Gtk.EventBox(sensitive=False)
         self.autoCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/auto_mode_icon.png"))         
 
-        self.stepSlideCuttingBtn = Gtk.EventBox()   
-        self.stepSlideCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png"))              
+        self.stepSlideCuttingBtn = Gtk.EventBox(sensitive=False)   
+        self.stepSlideCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png"))  
 
-        hBoxMainBtns = Gtk.HBox(homogeneous=True)
+        self.gstatModes.connect('all-homed',  self.set_sensitive_btns_modes)
 
-        hBoxMainBtns.pack_start(self.manualCuttingBtn,False,False,0)
-        hBoxMainBtns.pack_start(self.autoCuttingBtn,False,False,0)
-        hBoxMainBtns.pack_start(self.stepSlideCuttingBtn,False,False,0)
+        self.gstatModes.connect('not-all-homed', self.unset_sensitive_btns_modes)          
 
-        self.notebookPages.append_page(hBoxMainBtns)
+        vGridMainBtns = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)
+
+        vGridMainBtns.add(self.homeAxisBtn)
+        vGridMainBtns.attach(self.manualCuttingBtn,1,0,1,1)
+        vGridMainBtns.attach(self.autoCuttingBtn,0,1,1,1)
+        vGridMainBtns.attach(self.stepSlideCuttingBtn,1,1,1,1)
+
+        self.notebookPages.append_page(vGridMainBtns)       
 
         self.manualCuttingBtn.connect('button-press-event',self.on_manualCutting_btn_pressed)
         self.manualCuttingBtn.connect('button-release-event',self.on_manualCutting_btn_released)
@@ -134,7 +164,7 @@ class MyWindow(Gtk.Window):
 
         #Build Manual Cutting Page 
 
-        self.manualCuttingProfileWidget = ManualProfileCutWidget(self)
+        self.manualCuttingProfileWidget = ManualProfileCutWidget(self)       
 
         self.playManualBtn = Gtk.EventBox(can_focus=True)
         self.playManualBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))  
@@ -161,7 +191,7 @@ class MyWindow(Gtk.Window):
         vboxManualPage.pack_start(hboxManualCuttingProfileWidget,True,True,0)
         vboxManualPage.pack_end(hBoxManualCmdBtns,False,False,0)
 
-        self.notebookPages.append_page(vboxManualPage)
+        self.notebookPages.append_page(vboxManualPage)      
 
         self.playManualBtn.connect('button-press-event',self.on_playManual_btn_pressed)
         self.playManualBtn.connect('button-release-event',self.on_playManual_btn_released)
@@ -210,10 +240,13 @@ class MyWindow(Gtk.Window):
         self.settingsPage = Gtk.Box()
         self.settingsPage.set_border_width(10)
         self.settingsPage.add(Gtk.Label(label="Settings Page!."))
-        self.notebookPages.append_page(self.settingsPage)  
+        self.notebookPages.append_page(self.settingsPage) 
+
+        self.security_cmds_timer = GLib.timeout_add(self.update_rate_hal, self.on_security_cmds_timeout)
 
         self.add(vBoxMainStruct)
 
+        self.hal.ready()
 
     def on_manualCutting_btn_pressed(self,widget,event):
         child = widget.get_child()    
@@ -240,7 +273,17 @@ class MyWindow(Gtk.Window):
     def on_stepSlideCutting_btn_released(self,widget,event):
         self.notebookPages.set_current_page(self.pages['stepSlide']) 
         child = widget.get_child() 
-        child.set_from_file(filename="icons/step_slide_mode_icon.png")         
+        child.set_from_file(filename="icons/step_slide_mode_icon.png")   
+
+    def set_sensitive_btns_modes(self,gstat):
+        self.manualCuttingBtn.set_sensitive(True)
+        self.autoCuttingBtn.set_sensitive(True)
+        self.stepSlideCuttingBtn.set_sensitive(True)
+
+    def unset_sensitive_btns_modes(self,gstat,str):
+        self.manualCuttingBtn.set_sensitive(False)
+        self.autoCuttingBtn.set_sensitive(False)
+        self.stepSlideCuttingBtn.set_sensitive(False)    
 
     def on_ioStatus_btn_pressed(self,widget,event):
         widget.grab_focus()
@@ -302,28 +345,35 @@ class MyWindow(Gtk.Window):
 
     def on_angleLeftHeadManual_btn_pressed(self,widget,event):
         widget.grab_focus()
-        angleHeadManualState = {'90':0,'45':1,'angle':2}
+        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
         child = widget.get_child()
         if self.angleLeftHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/left_head_angle_90_icon_pressed.png")
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.svg") 
+            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.svg")
+        elif self.angleLeftHeadManualState == angleHeadManualState['135']:
+            child.set_from_file(filename="icons/left_head_angle_135_icon_pressed.svg") 
         elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
             child.set_from_file(filename="icons/left_head_angle_variable_icon_pressed.svg")       
 
     def on_angleLeftHeadManual_btn_released(self,widget,event): 
         child = widget.get_child() 
         self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(False)
-        angleHeadManualState = {'90':0,'45':1,'angle':2}
+        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
         if self.angleLeftHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/left_head_angle_45_icon.svg")
             self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%45)
             self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 45)            
             self.angleLeftHeadManualState = angleHeadManualState['45']
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
+            child.set_from_file(filename="icons/left_head_angle_135_icon.svg") 
+            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%135)
+            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 135)
+            self.angleLeftHeadManualState = angleHeadManualState['135'] 
+        elif self.angleLeftHeadManualState == angleHeadManualState['135']:
             child.set_from_file(filename="icons/left_head_angle_variable_icon.svg") 
             self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(True)
-            self.angleLeftHeadManualState = angleHeadManualState['angle'] 
+            self.angleLeftHeadManualState = angleHeadManualState['angle']
         elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
             child.set_from_file(filename="icons/left_head_angle_90_icon.svg")
             self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%90)
@@ -332,25 +382,32 @@ class MyWindow(Gtk.Window):
 
     def on_angleRightHeadManual_btn_pressed(self,widget,event):
         widget.grab_focus()
-        angleHeadManualState = {'90':0,'45':1,'angle':2}
+        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
         child = widget.get_child()
         if self.angleRightHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/right_head_angle_90_icon_pressed.svg")
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
             child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.svg") 
+        elif self.angleRightHeadManualState == angleHeadManualState['135']:
+            child.set_from_file(filename="icons/right_head_angle_135_icon_pressed.svg")
         elif self.angleRightHeadManualState == angleHeadManualState['angle']:
             child.set_from_file(filename="icons/right_head_angle_variable_icon_pressed.svg")              
 
     def on_angleRightHeadManual_btn_released(self,widget,event): 
         child = widget.get_child()
         self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(False) 
-        angleHeadManualState = {'90':0,'45':1,'angle':2}
+        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
         if self.angleRightHeadManualState == angleHeadManualState['90']:
             child.set_from_file(filename="icons/right_head_angle_45_icon.svg")
             self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%45)
             self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 45)             
             self.angleRightHeadManualState = angleHeadManualState['45']
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
+            child.set_from_file(filename="icons/right_head_angle_135_icon.svg")
+            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%135)
+            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 135)
+            self.angleRightHeadManualState = angleHeadManualState['135']
+        elif self.angleRightHeadManualState == angleHeadManualState['135']:
             child.set_from_file(filename="icons/right_head_angle_variable_icon.svg") 
             self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(True)
             self.angleRightHeadManualState = angleHeadManualState['angle'] 
@@ -358,25 +415,42 @@ class MyWindow(Gtk.Window):
             child.set_from_file(filename="icons/right_head_angle_90_icon.svg")
             self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%90)
             self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 90)            
-            self.angleRightHeadManualState = angleHeadManualState['90']
+            self.angleRightHeadManualState = angleHeadManualState['90']   
 
+    def on_security_cmds_timeout(self):
+
+        return True
+    
+    def on_task_state_changed(self, widget, task_state):
+
+        pass
 
     def on_switch_page(self,notebook, page, page_num):
         if notebook == self.notebookPages:
-            if page_num != self.pages['main']:
-                self.notebookFooter.set_current_page(1)
-            else:
+            if page_num == self.pages['main']:
                 self.notebookFooter.set_current_page(0)
+            else:
+                self.notebookFooter.set_current_page(1)
 
     def on_exit_btn_pressed(self,widget,event):
         child = widget.get_child()
         child.set_from_file(filename="icons/exit_icon_pressed.png")  
 
     def on_exit_btn_released(self,widget,event):
-        Gtk.main_quit()        
+        try:
+            self.hal.exit()
+        except RuntimeError:
+            pass  # HAL component is already closed
+        GLib.source_remove(self.security_cmds_timer)
+        Gtk.main_quit()
 
-win = MyWindow()
-win.connect("destroy", Gtk.main_quit)
-win.show_all()
+     
+def main():
+    win = DoubleMiterMachine()
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
 
-Gtk.main()
+    Gtk.main()      
+
+if __name__ == '__main__':
+    main()
