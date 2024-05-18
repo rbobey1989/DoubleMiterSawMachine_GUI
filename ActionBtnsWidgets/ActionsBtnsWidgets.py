@@ -4,7 +4,7 @@ import gi
 # gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
-from gladevcp.hal_actions import EMC_ToggleAction_ESTOP,EMC_ToggleAction_Power,EMC_Action_Home
+from gladevcp.hal_actions import EMC_ToggleAction_ESTOP,EMC_ToggleAction_Power,EMC_Action_Home,EMC_Action_Stop
 from hal_glib import GStat
 
 
@@ -24,6 +24,7 @@ class myBtnEstoptoggleAction(Gtk.EventBox):
     def on_button_press_event(self, widget, event):
         self.EstopToggleAction.emit("activate")
         return True
+
     
 class myBtnOnOfftoggleAction(Gtk.EventBox):  
     def __init__(self):
@@ -79,3 +80,12 @@ class myBtnHomeAxisAction(Gtk.EventBox):
         self.get_child().set_from_file(filename="icons/zero_axis_icon.png")
         return True
     
+class myBtnMainPage(Gtk.EventBox):  
+    def __init__(self):
+        super(myBtnMainPage,self).__init__(sensitive=False)
+        self.gstat = GStat()
+
+        self.gstat.connect('state-off', lambda w: self.set_sensitive(False))
+        self.gstat.connect('state-estop', lambda w: self.set_sensitive(False))        
+
+  

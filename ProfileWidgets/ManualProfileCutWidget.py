@@ -241,27 +241,61 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.hboxTimeOutDisk.add(self.TimeOutDiskEntry)
         self.hboxTimeOutDisk.pack_start(self.varTimeOutDiskLabel,True,True,0)
         self.add_overlay(self.hboxTimeOutDisk)
-        
+
+        self.FbPosEntry = EntryNumpad(self,
+                                                  label='fbPos',
+                                                  h_align_entry= myAlign.END,
+                                                  v_align_entry= myAlign.START,                                                  
+                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
+                                                  v_align_bubbleNumpad=Gtk.ArrowType.UP,
+                                                  num_int_digits=4,
+                                                  num_decimal_digits=1,
+                                                  init_value=0                                                                                            
+                                                  )                                               
+        self.FbPosEntry.set_name('entryWithNumpadManualWidget')
+        self.FbPosEntry.set_can_focus(False)
+        self.FbPosEntry.set_max_length(7)
+        self.FbPosEntry.set_alignment(xalign=0.5)
+        self.FbPosEntry.set_halign(Gtk.Align.END)
+        self.FbPosEntry.set_valign(Gtk.Align.START)
+        self.add_overlay(self.FbPosEntry)        
+
+
     def set_lefTipAngle(self,angle):
-        self.lefTipAngle = angle        
+        self.lefTipAngle = angle    
+
+    def get_leftAngleProfile(self):
+        return self.lefTipAngle    
 
     def get_leftAngleProfileEntry(self):
         return self.leftAngleProfileEntry
 
     def set_rightTipAngle(self,angle):
         self.rightTipAngle = angle  
+    
+    def get_rightAngleProfile(self):
+        return self.rightTipAngle
 
     def get_rightAngleProfileEntry(self):
         return self.rightAngleProfileEntry
 
     def set_topLengthProfile(self,length):
-        self.topLengthProfile = length        
+        self.topLengthProfile = length  
+
+    def get_topLengthProfile(self):
+        return self.topLengthProfile      
 
     def set_bottomLengthProfile(self,length):
         self.bottomLengthProfile = length 
 
+    def get_bottomLengthProfile(self):
+        return self.bottomLengthProfile
+
     def set_heightProfile(self,length):
         self.heightProfile = length
+
+    def set_FbPos(self,length):
+        self.FbPosEntry.set_text('%.*f'%(self.FbPosEntry.get_num_decimal_digits(),length))
 
     def on_draw(self, widget, ctx):        
 
@@ -335,6 +369,12 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                               self.varTimeOutDiskLabel.get_allocated_width())
         self.hboxTimeOutDisk.set_margin_bottom(PADDING_LINE-self.TimeOutDiskEntry.get_allocated_height()/2)
         self.hboxTimeOutDisk.set_spacing(PADDING_LINE/8)
+
+        self.FbPosEntry.set_size_request(width=int(LENGTH_WIDTH*0.65),height=int(PADDING_LINE))
+        self.FbPosEntry.set_margin_right(2.2*PADDING_LINE - 
+                                        self.FbPosEntry.get_allocated_width()/1.75)
+        self.FbPosEntry.set_margin_top(PADDING_LINE-self.FbPosEntry.get_allocated_height()/2)
+        
 
 
         ctx.set_source_rgb(0.23, 0.61, 0.84)
