@@ -1,0 +1,59 @@
+# core HAL config file for simulation
+
+# first load all the RT modules that will be needed
+# kinematics
+loadrt [KINS]KINEMATICS
+#autoconverted  trivkins
+# motion controller, get name and thread periods from ini file
+loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS 
+# load 6 differentiators (for velocity and accel signals
+loadrt ddt names=ddt_x,ddt_xv
+loadrt sim_axis_hardware names=sim-hardware
+
+setp sim-hardware.Xmaxsw-upper  1000
+setp sim-hardware.Xmaxsw-lower  [JOINT_0]MAX_LIMIT
+setp sim-hardware.Xminsw-upper  [JOINT_0]MIN_LIMIT
+setp sim-hardware.Xminsw-lower  -1000
+setp sim-hardware.Xhomesw-pos   [JOINT_0]HOME_OFFSET
+setp sim-hardware.Xhomesw-hyst  0.6
+
+
+# add motion controller functions to servo thread
+addf motion-command-handler servo-thread
+addf motion-controller servo-thread
+# link the differentiator functions into the code
+addf ddt_x servo-thread
+addf ddt_xv servo-thread
+addf sim-hardware.update servo-thread
+
+# create HAL signals for position commands from motion module
+# loop position commands back to motion module feedback
+net Xpos joint.0.motor-pos-cmd => joint.0.motor-pos-fb ddt_x.in sim-hardware.Xcurrent-pos  
+
+net fake-all-home        sim-hardware.homesw-all
+net fake-all-limit       sim-hardware.limitsw-all
+net fake-all-limit-home  sim-hardware.limitsw-homesw-all
+
+net fake-both-x          sim-hardware.Xbothsw-out
+net fake-max-x           sim-hardware.Xmaxsw-out
+net fake-min-x           sim-hardware.Xminsw-out
+
+
+net fake-home-x  joint.0.home-sw-in        sim-hardware.Xhomesw-out
+
+
+net fake-both-home-x     sim-hardware.Xbothsw-homesw-out
+net fake-max-home-x      sim-hardware.Xmaxsw-homesw-out
+net fake-min-home-x      sim-hardware.Xminsw-homesw-out
+
+net xhoming  joint.0.homing => sim-hardware.Xhoming
+
+
+# send the position commands thru differentiators to
+# generate velocity and accel signals
+net Xvel ddt_x.out => ddt_xv.in
+net Xacc <= ddt_xv.out
+
+# estop loopback
+net estop-loop iocontrol.0.user-enable-out iocontrol.0.emc-enable-in
+
