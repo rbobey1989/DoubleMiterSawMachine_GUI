@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 import gi
-# gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk,Gdk,GLib
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk,Gdk, GLib ,GdkPixbuf
 
-import os,sys,threading,time
+import os,sys,csv,re,math
 
 import linuxcnc
 
@@ -14,8 +14,20 @@ import gladevcp.drowidget
 import hal
 from hal_glib import GStat
 
-from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget
+import ezdxf
+from ezdxf.math import Matrix44, Vec3, UCS
+from ezdxf.addons.drawing import RenderContext, Frontend
+from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
+
+from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget 
+from ProfileWidgets.BarWidget import BarWidget
 from ActionBtnsWidgets.ActionsBtnsWidgets import myBtnEstoptoggleAction,myBtnOnOfftoggleAction,myBtnHomeAxisAction
+from CSVViewerWidget.CSVViewerWidget import CSVViewerWidget
+from DxfViewer.DxfViewer import DxfViewer
+from DxfExplorer.DxfExplorer import DxfExplorer
+from DxfDataBase.DxfDataBase import DxfDataBase
 
 INFO = Info()
 STATUS = Status()
@@ -114,7 +126,12 @@ class DoubleMitreMachine(Gtk.Window):
 
         vBoxMainStruct.pack_end(vBoxFooter,False,True,0)                          
 
-        #Build Main Page
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Main Page                                                                                                         #####
+#####                                                                                                                                #####
+##########################################################################################################################################      
+
 
         self.homeAxisBtn = myBtnHomeAxisAction()
 
@@ -131,8 +148,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.gstatModes.connect('all-homed',  self.set_sensitive_btns_modes)
         self.gstatModes.connect('not-all-homed', self.unset_sensitive_btns_modes)   
-
-
 
         vGridMainBtns = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)
 
@@ -169,10 +184,18 @@ class DoubleMitreMachine(Gtk.Window):
         self.goHomePageBtn.connect('button-press-event',self.on_goHomePage_btn_pressed)
         self.goHomePageBtn.connect('button-release-event',self.on_goHomePage_btn_released)
 
-        #Build Manual Cutting Page 
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Manual Cutting Page                                                                                                #####
+#####                                                                                                                                #####
+##########################################################################################################################################      
 
+
+        
         self.manualCuttingProfileWidget = ManualProfileCutWidget(self)  
-        self.last_FbPos = 0.0     
+        self.last_FbPos = 0.0  
+
+        self.dxfViewerManual = DxfViewer(manual_profile_cut_widget=self.manualCuttingProfileWidget)   
 
         self.playManualBtn = Gtk.EventBox(can_focus=True)
         self.playManualBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))  
@@ -188,8 +211,8 @@ class DoubleMitreMachine(Gtk.Window):
         self.angleRightHeadManualBtn = Gtk.EventBox(can_focus=True)
         self.angleRightHeadManualBtn.add(Gtk.Image.new_from_file(filename="icons/right_head_angle_90_icon.png"))  
                     
-        vboxManualPage = Gtk.VBox(homogeneous=False) 
-        hboxManualCuttingProfileWidget = Gtk.HBox(homogeneous=False)      
+        vboxManualCuttingProfileWidget_ManualCmdBtns = Gtk.VBox(homogeneous=False) 
+        hboxManualCuttingProfileWidget = Gtk.HBox(homogeneous=False)     
         hboxManualCuttingProfileWidget.pack_start(self.manualCuttingProfileWidget,True,True,0)
 
         hBoxManualCmdBtns = Gtk.HBox(homogeneous=True)
@@ -198,10 +221,14 @@ class DoubleMitreMachine(Gtk.Window):
         hBoxManualCmdBtns.pack_start(self.angleRightHeadManualBtn,False,False,0)
         hBoxManualCmdBtns.pack_end(self.stopManualBtn,False,False,0)
 
-        vboxManualPage.pack_start(hboxManualCuttingProfileWidget,True,True,0)
-        vboxManualPage.pack_end(hBoxManualCmdBtns,False,False,0)
+        vboxManualCuttingProfileWidget_ManualCmdBtns.pack_start(hboxManualCuttingProfileWidget,True,True,0)
+        vboxManualCuttingProfileWidget_ManualCmdBtns.pack_end(hBoxManualCmdBtns,False,False,0)
 
-        self.notebookPages.append_page(vboxManualPage)      
+        hboxManualPage = Gtk.HBox(homogeneous=False)
+        hboxManualPage.pack_start(self.dxfViewerManual,False, False,0)
+        hboxManualPage.pack_end(vboxManualCuttingProfileWidget_ManualCmdBtns,True,True,0)
+
+        self.notebookPages.append_page(hboxManualPage)      
 
         self.playManualBtn.connect('button-press-event',self.on_playManual_btn_pressed)
         self.playManualBtn.connect('button-release-event',self.on_playManual_btn_released)
@@ -215,15 +242,66 @@ class DoubleMitreMachine(Gtk.Window):
         self.angleRightHeadManualBtn.connect('button-press-event',self.on_angleRightHeadManual_btn_pressed)
         self.angleRightHeadManualBtn.connect('button-release-event',self.on_angleRightHeadManual_btn_released)         
 
-        #Build Auto Cutting Page
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Auto Cutting Page                                                                                                #####
+#####                                                                                                                                #####
+##########################################################################################################################################      
 
-        gridAutoPage = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)        
-        gridAutoPage.add(Gtk.Label(label="Logo"))
-        gridAutoPage.attach(Gtk.Label(label="Auto Cutting Page!."),1,1,1,1)
- 
-        self.notebookPages.append_page(gridAutoPage)
+        vBoxAutoPage = Gtk.VBox(spacing=10,homogeneous=False)        
 
-        #Build Slide Cutting Page        
+        self.openListBtn = Gtk.EventBox(can_focus=True)
+        self.openListBtn.add(Gtk.Image.new_from_file(filename="icons/open_cut_list_csv.png"))  
+
+        self.saveListBtn = Gtk.EventBox(can_focus=True)
+        self.saveListBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png"))   
+
+        self.clearListBtn = Gtk.EventBox(can_focus=True)
+        self.clearListBtn.add(Gtk.Image.new_from_file(filename="icons/left_head_angle_90_icon.png"))  
+
+        self.openListBtn.connect('button-press-event',self.on_open_btn_pressed)
+        self.openListBtn.connect('button-release-event',self.on_open_btn_released)
+
+        self.saveListBtn.connect('button-press-event',self.on_save_clicked)
+        self.clearListBtn.connect('button-press-event',self.on_delete_clicked) 
+
+        hBoxAutoListBtns = Gtk.HBox(homogeneous=True)
+        hBoxAutoListBtns.pack_start(self.openListBtn,False,False,0)
+        hBoxAutoListBtns.pack_start(self.saveListBtn,False,False,0)
+        hBoxAutoListBtns.pack_end(self.clearListBtn,False,False,0)
+
+        self.barWidget = BarWidget()
+        self.barWidget.set_size_request(-1, 35)
+        self.barWidget.set_margin_start(10)
+        self.barWidget.set_margin_end(10)
+        vBoxAutoPage.pack_start(hBoxAutoListBtns,False,False,0)
+        vBoxAutoPage.pack_start(self.barWidget,True,True,0)
+        vBoxAutoPage.set_child_packing(self.barWidget, False, False, 0, Gtk.PackType.START)
+
+        # Create Dxf Viewer Widget
+        self.dxfViewer = DxfViewer(hide_buttons=True)
+
+        # Create CSV Viewer Widget
+        self.csvViewerWidget = CSVViewerWidget(barWidget=self.barWidget, dxfViewerWidget=self.dxfViewer)
+
+        hBoxTreeview = Gtk.HBox()
+        hBoxTreeview.set_name('hboxTreeview')
+        hBoxTreeview.pack_start(self.csvViewerWidget,True,True,0)
+
+        hboxTreeviewDxfViewer = Gtk.HBox(spacing=10,homogeneous=False)
+        hboxTreeviewDxfViewer.pack_start(hBoxTreeview,True,True,0)
+
+        hboxTreeviewDxfViewer.pack_end(self.dxfViewer,False,False,0)
+
+        vBoxAutoPage.pack_start(hboxTreeviewDxfViewer,True,True,0)
+
+        self.notebookPages.append_page(vBoxAutoPage)
+
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Slide Cutting Page                                                                                                #####
+#####                                                                                                                                #####
+##########################################################################################################################################      
 
         gridStepSlidePage = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)        
         gridStepSlidePage.add(Gtk.Label(label="Logo"))
@@ -231,21 +309,40 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.notebookPages.append_page(gridStepSlidePage)
 
-        #Build Auto Cutting Page
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Auto Cutting Page                                                                                               #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
 
         self.ioStatusPage = Gtk.Box()
         self.ioStatusPage.set_border_width(10)
         self.ioStatusPage.add(Gtk.Label(label="I/O Status Page!."))
         self.notebookPages.append_page(self.ioStatusPage)
 
-        #Build Auto Cutting Page
+        
+
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Auto Cutting Page                                                                                               #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
 
         self.alarmCodesPage = Gtk.Box()
         self.alarmCodesPage.set_border_width(10)
         self.alarmCodesPage.add(Gtk.Label(label="Alarms Codes Page!."))
         self.notebookPages.append_page(self.alarmCodesPage)         
 
-        #Build Auto Cutting Page
+        
+
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Auto Cutting Page                                                                                               #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
 
         self.settingsPage = Gtk.Box()
         self.settingsPage.set_border_width(10)
@@ -290,13 +387,11 @@ class DoubleMitreMachine(Gtk.Window):
         self.manualCuttingBtn.set_sensitive(True)
         self.autoCuttingBtn.set_sensitive(True)
         self.stepSlideCuttingBtn.set_sensitive(True)
-        print('set_sensitive_btns_modes')
 
     def unset_sensitive_btns_modes(self,gstat,str):
         self.manualCuttingBtn.set_sensitive(False)
         self.autoCuttingBtn.set_sensitive(False)
         self.stepSlideCuttingBtn.set_sensitive(False) 
-        print('unset_sensitive_btns_modes')
 
     def on_ioStatus_btn_pressed(self,widget,event):
         widget.grab_focus()
@@ -337,6 +432,32 @@ class DoubleMitreMachine(Gtk.Window):
         self.notebookPages.set_current_page(self.pages['main']) 
         child = widget.get_child() 
         child.set_from_file(filename="icons/go_home_icon.png") 
+
+    def on_switch_page(self,notebook, page, page_num):
+        if notebook == self.notebookPages:
+            if page_num == self.pages['main']:
+                self.notebookFooter.set_current_page(0)
+            else:
+                self.notebookFooter.set_current_page(1)
+
+    def on_exit_btn_pressed(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/exit_icon_pressed.png")  
+
+    def on_exit_btn_released(self,widget,event):
+        try:
+            self.hal_component.exit()
+        except RuntimeError:
+            pass  # HAL component is already closed
+        GLib.source_remove(self.update_cmds_timer)
+        GLib.source_remove(self.update_gui_timer)
+        Gtk.main_quit()
+
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       Manual Mode Logic Develop                                                                                                #####
+#####                                                                                                                                #####
+##########################################################################################################################################
 
     def on_playManual_btn_pressed(self,widget,event):
         widget.grab_focus()
@@ -466,6 +587,64 @@ class DoubleMitreMachine(Gtk.Window):
             self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 90)            
             self.angleRightHeadManualState = angleHeadManualState['90']   
 
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       Automatic Mode Logic Develop                                                                                             #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+    def on_open_btn_pressed(self, widget, event):
+
+        child = widget.get_child()
+        child.set_from_file(filename="icons/open_cut_list_csv_pressed.png")
+
+    def on_open_btn_released(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/open_cut_list_csv.png")
+
+        fileChooserDialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
+            Gtk.FileChooserAction.OPEN,
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        
+        response = fileChooserDialog.run()
+        if response == Gtk.ResponseType.OK:
+            self.csvViewerWidget.get_treestore().clear()
+            if not self.csvViewerWidget.validate_csv_format(fileChooserDialog.get_filename()):
+                error_dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
+                    Gtk.ButtonsType.OK, "Error")
+                error_dialog.format_secondary_text(
+                    f"Error: The file {fileChooserDialog.get_filename()} does not have the correct CSV format.")
+                error_dialog.run()
+                error_dialog.destroy()                
+            else:
+                print(f"The file {fileChooserDialog.get_filename()} has the correct CSV format.")
+                self.csvViewerWidget.load_csv(fileChooserDialog.get_filename())
+
+        fileChooserDialog.destroy()
+
+    def on_save_clicked(self, widget, event):
+        dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
+            Gtk.FileChooserAction.SAVE,
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+
+        response = dialog.run()
+        if response == Gtk.ResponseType.OK:
+            with open(dialog.get_filename(), 'w') as f:
+                writer = csv.writer(f)
+                self.csvViewerWidget.write_rows(writer, self.csvViewerWidget.get_treestore())
+
+        dialog.destroy()
+
+    def on_delete_clicked(self, widget, event):
+        self.csvViewerWidget.get_treestore().clear()
+        self.barWidget.update_bar([])
+        self.dxfViewer.clear_dxf()
+    
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       Automatic Mode Logic Develop                                                                                             #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
     def on_update_cmds_timeout(self):
 
         # s = linuxcnc.stat()
@@ -489,26 +668,6 @@ class DoubleMitreMachine(Gtk.Window):
             self.last_FbPos = pos_fb_value
 
         return True
-
-    def on_switch_page(self,notebook, page, page_num):
-        if notebook == self.notebookPages:
-            if page_num == self.pages['main']:
-                self.notebookFooter.set_current_page(0)
-            else:
-                self.notebookFooter.set_current_page(1)
-
-    def on_exit_btn_pressed(self,widget,event):
-        child = widget.get_child()
-        child.set_from_file(filename="icons/exit_icon_pressed.png")  
-
-    def on_exit_btn_released(self,widget,event):
-        try:
-            self.hal_component.exit()
-        except RuntimeError:
-            pass  # HAL component is already closed
-        GLib.source_remove(self.update_cmds_timer)
-        GLib.source_remove(self.update_gui_timer)
-        Gtk.main_quit()
 
     def postgui(self):
         inifile = linuxcnc.ini(self.ini_file)

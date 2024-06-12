@@ -26,3 +26,45 @@
 	background: rgb(128, 132, 137);
 }
 
+
+
+
+#scrolled_window scrollbar {
+    -GtkScrollbar-has-backward-stepper: true;
+    -GtkScrollbar-has-forward-stepper: true;
+}
+
+#scrolled_window scrollbar slider {
+    /* Tamaño del slider */
+    min-width: 30px;
+    min-height: 20px;
+    border-radius: 10px;
+
+    /* Color del slider */
+    background-color: #a5a4a1;
+}
+
+#scrolled_window scrollbar trough {
+    /* Color del trough */
+    background-color: #d8d7d7;
+}
+
+#scrolled_window scrollbar button {
+    /* Tamaño de los botones */
+    min-width: 30px;
+    min-height: 20px;
+
+    /* Color de los botones */
+    background-color: #a3a3a3;
+}
+
+#listTreeview {
+    font-size: 24px; /* Ajusta el tamaño de la fuente a tus necesidades */
+	font-weight: bold; /* Hace que la fuente sea negrita */
+}
+
+#hboxTreeview {
+	background: rgb(255,255,255);
+}
+
+

@@ -19,11 +19,11 @@ class ManualProfileCutWidget(Gtk.Overlay):
     def __init__(
         self, 
         parent,
-        height_prof : float = 0.2, 
+        height_prof : float = 0.15, 
         height_arrow :  float = 0.7,
         width_arrow :  float = 1.5,
-        y_offset :  float = 0.4,
-        x_offset :  float = 0.2,
+        y_offset :  float = 0.425,
+        x_offset :  float = 0.24,
         padding_line :  float = 0.15,
         length_width :  float = 0.25,
         height_bubble_numpad : float = 0.50, 
@@ -80,7 +80,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         self.add_overlay(drawingArea) 
         self.connect('get-child-position',self.on_get_child_position) 
-        self.connect('update-value', self.on_update_value)       
+        self.connect('update-value', self.on_update_value)  
 
         self.topLengthProfileEntry = EntryNumpad(self,
                                                  label='entryTopLengths',
@@ -269,6 +269,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
     def get_leftAngleProfileEntry(self):
         return self.leftAngleProfileEntry
+    
+    def get_HeightProfileEntry(self):
+        return self.HeightProfileEntry
 
     def set_rightTipAngle(self,angle):
         self.rightTipAngle = angle  
@@ -293,6 +296,9 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
     def set_heightProfile(self,length):
         self.heightProfile = length
+
+    def get_heightProfile(self):
+        return self.heightProfile
 
     def set_FbPos(self,length):
         self.FbPosEntry.set_text('%.*f'%(self.FbPosEntry.get_num_decimal_digits(),length))
@@ -589,4 +595,6 @@ class ManualProfileCutWidget(Gtk.Overlay):
             self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
             self.topLengthProfileEntry.set_text('%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),self.topLengthProfile))
 
-        self.queue_draw()           
+        self.queue_draw()   
+
+
