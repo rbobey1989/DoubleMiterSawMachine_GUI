@@ -27,7 +27,6 @@ class CSVViewerWidget(Gtk.Box):
         self.checked_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/check_icon.png")
         self.unchecked_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/uncheck_icon.png")
         
-        
         # Add a CellRendererPixbuf for the expander
         renderer_pixbuf_expander = Gtk.CellRendererPixbuf()
         self.expand_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/expand_icon.png")
@@ -218,23 +217,35 @@ class CSVViewerWidget(Gtk.Box):
 
             if self.treestore.iter_has_child(iter):
                 # This is a parent row, so update all child rows
-                for i in range(self.treestore.iter_n_children(iter)):
-                    child_iter = self.treestore.iter_nth_child(iter, i)
-                    self.treestore[child_iter][0] = self.treestore[iter][0]
-                    if self.treestore[child_iter][0]:
-                        self.treestore[child_iter][1] = self.checked_pixbuf
-                    else:
-                        self.treestore[child_iter][1] = self.unchecked_pixbuf
-            else:
-                # This is a child row, so update the parent row if necessary
-                parent_iter = self.treestore.iter_parent(iter)
-                if parent_iter is not None:
-                    all_selected = any(self.treestore[self.treestore.iter_nth_child(parent_iter, i)][0] for i in range(self.treestore.iter_n_children(parent_iter)))
-                    self.treestore[parent_iter][0] = all_selected
-                    if self.treestore[parent_iter][0]:
-                        self.treestore[parent_iter][1] = self.checked_pixbuf
-                    else:
-                        self.treestore[parent_iter][1] = self.unchecked_pixbuf
+                self.update_children(iter, self.treestore[path][0], self.treestore[path][1])
+
+                    # Get the parent iterator
+            parent_iter = self.treestore.iter_parent(iter)
+
+            # If the row has a parent and all siblings are in the desired state, set the parent to the desired state
+            while parent_iter:
+                if self.are_all_children(parent_iter, self.treestore[path][0]):
+                    self.treestore[parent_iter][0] = self.treestore[path][0]
+                    self.treestore[parent_iter][1] = self.treestore[path][1]
+                parent_iter = self.treestore.iter_parent(parent_iter)
+
+    def update_children(self, parent_iter, new_state, new_pixbuf):
+        for i in range(self.treestore.iter_n_children(parent_iter)):
+            child_iter = self.treestore.iter_nth_child(parent_iter, i)
+            self.treestore[child_iter][0] = new_state
+            self.treestore[child_iter][1] = new_pixbuf
+            if self.treestore.iter_has_child(child_iter):
+                self.update_children(child_iter, new_state, new_pixbuf)
+
+    def are_all_children(self, parent_iter, state):
+        for i in range(self.treestore.iter_n_children(parent_iter)):
+            child_iter = self.treestore.iter_nth_child(parent_iter, i)
+            if self.treestore[child_iter][0] != state:  # If the child's state is not the desired state
+                return False
+            if self.treestore.iter_has_child(child_iter):  # If the child has children
+                if not self.are_all_children(child_iter, state):  # If any grandchild's state is not the desired state
+                    return False
+        return True
 
     def on_cell_edited(self, cell, path, new_text, column):
         # Convert the path to a Gtk.TreeIter
@@ -280,6 +291,11 @@ class CSVViewerWidget(Gtk.Box):
 
                 if self.dxfViewerWidget != None:
                     self.dxfViewerWidget.update_dxf(rows_with_same_bar_num)
+            else:
+                if self.barWidget != None:
+                    self.barWidget.update_bar([])
+                if self.dxfViewerWidget != None:
+                    self.dxfViewerWidget.clear_dxf()
 
     def get_rows_by_bar_num(self, model, parent_iter, bar_num_column, bar_num):
         # Create a list to store the rows with the given bar number
@@ -306,9 +322,12 @@ class CSVViewerWidget(Gtk.Box):
             if row_bar_num == bar_num:
                 # Get the row as a list of column values
                 row = [model.get_value(child_iter, j) for j in range(model.get_n_columns())]
-                if row[0]:
-                    row.pop(1)
-                    rows_with_same_bar_num.append(row)
+                # if row[0]:
+                #     row.pop(1)
+                #     rows_with_same_bar_num.append(row)
+
+                row.pop(1)
+                rows_with_same_bar_num.append(row)
 
         return rows_with_same_bar_num
     

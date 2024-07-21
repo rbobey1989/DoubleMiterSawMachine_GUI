@@ -37,6 +37,8 @@ class BubbleNumpad(Gtk.Overlay):
                  ('7','8','9'),
                  ('.','0','←')]
         
+        self.clearChar = 'Clear'
+        
         drawingArea = Gtk.DrawingArea(can_focus=False)
         self.add_overlay(drawingArea)
         drawingArea.connect("draw", self.on_draw)
@@ -49,6 +51,11 @@ class BubbleNumpad(Gtk.Overlay):
                 self.grid.attach(button,j,i,1,1) 
                 button.connect("clicked", self.on_button_clicked_event)
 
+
+        clearBtn = Gtk.Button(label=self.clearChar,expand=True,can_focus=False, name='bubbleNumpadButton')
+        clearBtn.connect("clicked", self.on_button_clicked_event)
+        self.grid.attach(clearBtn,0,4,3,1)
+
         self.add_overlay(self.grid)
 
     def get_parent(self):
@@ -59,14 +66,17 @@ class BubbleNumpad(Gtk.Overlay):
 
     def get_v_align(self):
         return self.v_align 
-
-
     
     def get_label(self):
         return self.label
 
     def on_button_clicked_event(self, widget):
         widget = widget.get_child() 
+
+        if widget.get_label() == 'Clear':
+            self.par.set_text('')
+            return
+
         if widget.get_label() != '←':
             self.par.set_text(self.par.get_text() + widget.get_label())
         else:

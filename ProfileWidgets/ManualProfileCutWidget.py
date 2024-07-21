@@ -31,7 +31,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         min_length : float = 240.00,
         max_length : float = 6500.00,            
         min_angle: float = 22.5,
-        max_angle: float = 157.5    
+        max_angle: float = 157.5
         ):
         super(ManualProfileCutWidget, self).__init__() 
 
@@ -58,6 +58,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         self.focusTopLengthProfile = True
         self.focusBottomLengthProfile = False 
+
+        self.dxfViewer = None
 
         screen = Gdk.Screen.get_default()
         self.provider = Gtk.CssProvider()
@@ -586,8 +588,13 @@ class ManualProfileCutWidget(Gtk.Overlay):
                 entry.set_text('%.*f'%(entry.get_num_decimal_digits(),get_sideLength(entry)))
         elif entry == self.HeightProfileEntry:
             self.set_heightProfile(value)
+            self.dxfViewer.emit('clear-dxf')
             entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.heightProfile))
 
+        self.updateLengths()
+        self.queue_draw()  
+
+    def updateLengths(self): 
         if self.focusTopLengthProfile == True:
             self.bottomLengthProfile = self.topLengthProfile - self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
             self.bottomLengthProfileEntry.set_text('%.*f'%(self.bottomLengthProfileEntry.get_num_decimal_digits(),self.bottomLengthProfile))
@@ -595,6 +602,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
             self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
             self.topLengthProfileEntry.set_text('%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),self.topLengthProfile))
 
-        self.queue_draw()   
+    def set_dxfViewer(self,dxfViewer):
+        self.dxfViewer = dxfViewer
 
 

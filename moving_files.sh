@@ -9,6 +9,7 @@ src_path8="CSVViewerWidget"
 src_path9="DxfViewer"
 src_path10="DxfExplorer"
 src_path11="DxfDataBase"
+src_path12="LogViewer"
 dest_path_src="/usr/bin/DoubleMitreSawMachine/"
 
 dest_path_config="/home/rbobey1989/linuxcnc/configs/DoubleMitreSawMachine/"
@@ -51,6 +52,10 @@ if [ -d "${dest_path_config}${src_path11}" ]; then
     rm -r "${dest_path_config}${src_path11}"
 fi
 
+if [ -d "${dest_path_config}${src_path12}" ]; then
+    rm -r "${dest_path_config}${src_path12}"
+fi
+
 if [ -d "${dest_path_config}${src_path4}" ]; then
     rm -r "${dest_path_config}${src_path4}"
 fi
@@ -77,6 +82,7 @@ cp -r "$src_path8" "${dest_path_src}"
 cp -r "$src_path9" "${dest_path_src}"
 cp -r "$src_path10" "${dest_path_src}"
 cp -r "$src_path11" "${dest_path_src}"
+cp -r "$src_path12" "${dest_path_src}"
 
 cp -r "$src_path4" "${dest_path_config}"
 cp -r "$src_path5" "${dest_path_config}"

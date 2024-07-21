@@ -18,11 +18,11 @@ class BarWidget(Gtk.DrawingArea):
         try:
             self.bar_length = int(data[0][4])
             for row in data[1:]:
-                print(row[6])
+                do_cut = row[0]
                 distance = int(row[6]) / self.bar_length
                 angle1 = int(row[7])
                 angle2 = int(row[8])
-                cuts.append((distance, angle1, angle2))
+                cuts.append((do_cut, distance, angle1, angle2))
             self.cuts = cuts
         except:
             self.bar_length = None
@@ -53,7 +53,7 @@ class BarWidget(Gtk.DrawingArea):
         # Draw the cuts
         accumulated_length = 0
         last_angle2 = 0
-        for distance, angle1, angle2 in self.cuts:
+        for do_cut, distance, angle1, angle2 in self.cuts:
             x = accumulated_length
             accumulated_length += distance * width
             cut_width_angle1 = math.tan(math.radians(90 - angle1)) * height
@@ -101,8 +101,14 @@ class BarWidget(Gtk.DrawingArea):
             cr.line_to(x3, y3)
             cr.close_path()
 
-            # Fill the smaller parallelogram
-            cr.set_source_rgb(0.23, 0.61, 0.84)  # Red color
+
+            # Fill the smaller parallelogram with the appropriate color
+            if do_cut:
+                # Set the color to red if the cut is to be made
+                cr.set_source_rgb(0.23, 0.61, 0.84)
+            else:
+                # Set the color to green if the cut is not to be made
+                cr.set_source_rgb(0.84,0.61, 0.23)
             cr.fill()  # Fill the parallelogram
 
             # Draw the border

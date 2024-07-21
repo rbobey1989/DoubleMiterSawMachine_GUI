@@ -13,14 +13,20 @@ import math
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GObject
+from gi.repository import Gtk, GObject, Gdk
 
 class DxfViewer(Gtk.Box):
     __gsignals__ = {
-        "update-dimensions-dxf": (GObject.SignalFlags.RUN_FIRST, None, (ManualProfileCutWidget, float, float))
+        "update-dimensions-dxf": (GObject.SignalFlags.RUN_FIRST, None, (ManualProfileCutWidget, float, float)),
+        "clear-dxf": (GObject.SignalFlags.RUN_FIRST, None, ())
     }
     def __init__(self, hide_buttons=False, manual_profile_cut_widget=None):
         super(DxfViewer, self).__init__()
+
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_path('css_styles_sheets/DXFViewerstyle.css')
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)        
+
 
         self.hide_buttons = hide_buttons
 
@@ -32,6 +38,7 @@ class DxfViewer(Gtk.Box):
 
         if self.manual_profile_cut_widget != None:
             self.connect("update-dimensions-dxf", self.on_update_dimensions_dxf)
+            self.connect("clear-dxf", self.on_clear_dxf)
 
         self.added_entities = []  # Initialize the list of added entities
         self.frame_percent_offset = 0.125
@@ -50,6 +57,7 @@ class DxfViewer(Gtk.Box):
 
         self.manufacturer_combobox.connect("changed", self.on_manufacturer_changed)
         self.set_combobox.connect("changed", self.on_set_changed)
+        self.code_combobox.connect("changed", self.on_code_changed)
 
         self.update_manufacturer_combo()
 
@@ -93,14 +101,14 @@ class DxfViewer(Gtk.Box):
         self.canvas = FigureCanvas(self.fig)
 
         # Create 'open','rot' and 'mirror' buttons
-        open_button = Gtk.Button(label="Open")
-        rot_rigth_button = Gtk.Button(label="Rot Right")
-        rot_left_button = Gtk.Button(label="Rot Left")
-        x_inv_button = Gtk.Button(label="X INV")
-        y_inv_button = Gtk.Button(label="Y INV")
+        # open_button = Gtk.Button(label="Open")
+        rot_rigth_button = Gtk.Button(label="RotR", name="DXFViewerButton")
+        rot_left_button = Gtk.Button(label="RotL", name="DXFViewerButton")
+        x_inv_button = Gtk.Button(label="XInv", name="DXFViewerButton")
+        y_inv_button = Gtk.Button(label="YInv", name="DXFViewerButton")
 
         # Connect the buttons to their respective callback functions
-        open_button.connect("clicked", self.on_open_clicked)
+        # open_button.connect("clicked", self.on_open_clicked)
         rot_rigth_button.connect("clicked", self.on_rot_rigth_clicked)
         rot_left_button.connect("clicked", self.on_rot_left_clicked)
         x_inv_button.connect("clicked", self.on_x_invert)
@@ -109,10 +117,10 @@ class DxfViewer(Gtk.Box):
         # Create a vertical box layout and add the canvas and buttons
         vboxcanvasbtns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         vboxcanvasbtns.pack_start(self.canvas, True, True, 0)
-        hboxbtns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        hboxbtns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
 
         if not self.hide_buttons:
-            hboxbtns.pack_start(open_button, False, False, 0)
+            # hboxbtns.pack_start(open_button, False, False, 0)
             hboxbtns.pack_start(rot_rigth_button, False, False, 0)
             hboxbtns.pack_start(rot_left_button, False, False, 0)
             hboxbtns.pack_start(x_inv_button, False, False, 0)
@@ -180,6 +188,32 @@ class DxfViewer(Gtk.Box):
 
         # Close the database connection
         db.close()
+
+    def on_code_changed(self, combobox):
+        # Create a new instance of DxfDataBase
+        db = DxfDataBase()
+
+        # Get the selected manufacturer
+        manufacturer = self.manufacturer_combobox.get_active_text()
+
+        # Get the selected set
+        set = self.set_combobox.get_active_text()
+
+        # Get the selected code
+        code = combobox.get_active_text()
+
+        # Check if the manufacturer, set, and code are not None
+        if manufacturer == None or set == None or code == None:
+            return
+
+        # Get the path of the DXF file
+        path = db.get_dxf_file(manufacturer, set, code)
+
+        # Close the database connection
+        db.close()
+
+        # Draw the DXF file
+        self.draw_dxf(path)
 
     def update_frames(self):
 
@@ -287,7 +321,9 @@ class DxfViewer(Gtk.Box):
             # Remove the entity from the modelspace
             self.doc.modelspace().delete_entity(e)
 
-        self.doc_to_show.modelspace().delete_all_entities()
+        
+        if self.doc_to_show is not None:
+            self.doc_to_show.modelspace().delete_all_entities()
 
         # Clear the list of added entities
         self.added_entities = []
@@ -302,27 +338,27 @@ class DxfViewer(Gtk.Box):
         self.ax.figure.canvas.draw()
 
 
-    def on_open_clicked(self, button):
-        # Create a new instance of DxfDataBase
-        db = DxfDataBase()
+    # def on_open_clicked(self, button):
+    #     # Create a new instance of DxfDataBase
+    #     db = DxfDataBase()
 
-        # Get the selected manufacturer, set, and code
-        manufacturer = self.manufacturer_combobox.get_active_text()
-        set = self.set_combobox.get_active_text()
-        code = self.code_combobox.get_active_text()
+    #     # Get the selected manufacturer, set, and code
+    #     manufacturer = self.manufacturer_combobox.get_active_text()
+    #     set = self.set_combobox.get_active_text()
+    #     code = self.code_combobox.get_active_text()
 
-        # Check if the manufacturer, set, and code are not None
-        if manufacturer == None or set == None or code == None:
-            return
+    #     # Check if the manufacturer, set, and code are not None
+    #     if manufacturer == None or set == None or code == None:
+    #         return
 
-        # Get the path of the DXF file
-        path = db.get_dxf_file(manufacturer, set, code)
+    #     # Get the path of the DXF file
+    #     path = db.get_dxf_file(manufacturer, set, code)
 
-        # Close the database connection
-        db.close()
+    #     # Close the database connection
+    #     db.close()
 
-        # Draw the DXF file
-        self.draw_dxf(path)
+    #     # Draw the DXF file
+    #     self.draw_dxf(path)
 
     def update_dxf(self, data):
         # Create a new instance of DxfDataBase
@@ -506,6 +542,13 @@ class DxfViewer(Gtk.Box):
         entry_height_profile = manual_profile_cut.get_HeightProfileEntry()
         manual_profile_cut.set_heightProfile(height)
         entry_height_profile.set_text('%.*f'%(entry_height_profile.get_num_decimal_digits(),manual_profile_cut.get_heightProfile()))
+        manual_profile_cut.updateLengths()
         manual_profile_cut.queue_draw()
+
+    def on_clear_dxf(self, widget):
+        self.manufacturer_combobox.set_active(-1)
+        self.set_combobox.set_active(-1)
+        self.code_combobox.set_active(-1)
+        self.clear_dxf()
         
         

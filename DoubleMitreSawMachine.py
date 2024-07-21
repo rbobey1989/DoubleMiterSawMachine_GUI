@@ -2,32 +2,26 @@
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk,Gdk, GLib ,GdkPixbuf
+from gi.repository import Gtk,Gdk, GLib
 
-import os,sys,csv,re,math
+import os,sys,csv
 
 import linuxcnc
 
 from gladevcp.core import Info, Status, Action
-import gladevcp.drowidget
 
 import hal
 from hal_glib import GStat
 
-import ezdxf
-from ezdxf.math import Matrix44, Vec3, UCS
-from ezdxf.addons.drawing import RenderContext, Frontend
-from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_gtk3agg import FigureCanvasGTK3Agg as FigureCanvas
-
 from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget 
 from ProfileWidgets.BarWidget import BarWidget
 from ActionBtnsWidgets.ActionsBtnsWidgets import myBtnEstoptoggleAction,myBtnOnOfftoggleAction,myBtnHomeAxisAction
+
 from CSVViewerWidget.CSVViewerWidget import CSVViewerWidget
 from DxfViewer.DxfViewer import DxfViewer
 from DxfExplorer.DxfExplorer import DxfExplorer
 from DxfDataBase.DxfDataBase import DxfDataBase
+from LogViewer.LogViewer import LogViewer
 
 INFO = Info()
 STATUS = Status()
@@ -42,13 +36,11 @@ class DoubleMitreMachine(Gtk.Window):
         # self.fullscreen()
         self.set_border_width(0) 
 
-        self.ini_file = os.environ["INI_FILE_NAME"]
-        print(self.ini_file)
+        self.inifile = linuxcnc.ini(os.environ["INI_FILE_NAME"])
 
         css_provider = Gtk.CssProvider()
         css_provider.load_from_path('css_styles_sheets/style.css')
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
 
         self.hal_component = hal.component("DoubleMitreMachine")
         self.update_rate_cmds = 100
@@ -74,7 +66,13 @@ class DoubleMitreMachine(Gtk.Window):
         self.exitBtn.add(Gtk.Image.new_from_file(filename="icons/exit_icon.png"))         
 
         self.goHomePageBtn = Gtk.EventBox(can_focus=True)
-        self.goHomePageBtn.add(Gtk.Image.new_from_file(filename="icons/go_home_icon.png"))          
+        self.goHomePageBtn.add(Gtk.Image.new_from_file(filename="icons/go_home_icon.png"))  
+
+        self.log_viewer = LogViewer()
+        self.log_viewer.set_name('scrolled_window')   
+        
+        GLib.idle_add(lambda: self.log_viewer.set_margin_start(self.goHomePageBtn.get_allocated_width()))
+        GLib.idle_add(lambda: self.log_viewer.set_margin_end(0)) 
 
         vBoxMainStruct = Gtk.VBox(homogeneous=False,vexpand=True)
 
@@ -106,23 +104,19 @@ class DoubleMitreMachine(Gtk.Window):
         self.notebookPages = Gtk.Notebook(name='notebookPages',show_tabs=False,show_border=False)
 
         self.pages = {'main':0,'manual':1,'auto':2,'stepSlide':3,
-                     'ioState':4,'alarms':5,'settings':6}
+                     'ioState':4,'alarms':5,'settings':6,'dxfExplorer':7}
 
         vBoxMainStruct.pack_start(self.notebookPages,False,True,0)
 
         vBoxFooter = Gtk.VBox()
-        self.notebookFooter = Gtk.Notebook(name='footer',show_tabs=False,show_border=False)
 
-        hBoxFooterGoHomePage = Gtk.HBox()        
-        hBoxFooterExitPage = Gtk.HBox()
+        hBoxFooter = Gtk.HBox(name='footer')
+        
+        hBoxFooter.pack_start(self.goHomePageBtn,False,False,0)
+        hBoxFooter.pack_start(self.log_viewer,True,True,0)
+        hBoxFooter.pack_end(self.exitBtn,False,False,0)
 
-        hBoxFooterGoHomePage.pack_start(self.goHomePageBtn,False,False,0)
-        hBoxFooterExitPage.pack_end(self.exitBtn,False,False,0)
-
-        self.notebookFooter.append_page(hBoxFooterExitPage)
-        self.notebookFooter.append_page(hBoxFooterGoHomePage)
-
-        vBoxFooter.pack_end(self.notebookFooter,False,False,0)
+        vBoxFooter.pack_start(hBoxFooter,False,False,0)
 
         vBoxMainStruct.pack_end(vBoxFooter,False,True,0)                          
 
@@ -144,7 +138,10 @@ class DoubleMitreMachine(Gtk.Window):
         self.autoCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/auto_mode_icon.png"))         
 
         self.stepSlideCuttingBtn = Gtk.EventBox(sensitive=False)   
-        self.stepSlideCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png"))  
+        self.stepSlideCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png")) 
+
+        self.manageDxfBtn = Gtk.EventBox()
+        self.manageDxfBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png")) 
 
         self.gstatModes.connect('all-homed',  self.set_sensitive_btns_modes)
         self.gstatModes.connect('not-all-homed', self.unset_sensitive_btns_modes)   
@@ -153,8 +150,10 @@ class DoubleMitreMachine(Gtk.Window):
 
         vGridMainBtns.add(self.homeAxisBtn)
         vGridMainBtns.attach(self.manualCuttingBtn,1,0,1,1)
+        vGridMainBtns.attach(self.manageDxfBtn,2,0,1,1)
         vGridMainBtns.attach(self.autoCuttingBtn,0,1,1,1)
         vGridMainBtns.attach(self.stepSlideCuttingBtn,1,1,1,1)
+        
 
         self.notebookPages.append_page(vGridMainBtns)       
 
@@ -184,18 +183,23 @@ class DoubleMitreMachine(Gtk.Window):
         self.goHomePageBtn.connect('button-press-event',self.on_goHomePage_btn_pressed)
         self.goHomePageBtn.connect('button-release-event',self.on_goHomePage_btn_released)
 
+        self.manageDxfBtn.connect('button-press-event',self.on_manageDxf_btn_pressed)
+        self.manageDxfBtn.connect('button-release-event',self.on_manageDxf_btn_released)
+
 ##########################################################################################################################################
 #####                                                                                                                                #####
 #####       #Build Manual Cutting Page                                                                                                #####
 #####                                                                                                                                #####
 ##########################################################################################################################################      
 
+        self.inside_angles = self.inifile.find("TRAJ", "INSIDE_ANGLES") or "unknown"
+        max_angle = 90.0 if self.inside_angles == "NO" else ( 157.5 if self.inside_angles == "YES" else 90.0)
 
-        
-        self.manualCuttingProfileWidget = ManualProfileCutWidget(self)  
+        self.manualCuttingProfileWidget = ManualProfileCutWidget(self,max_angle=max_angle)  
         self.last_FbPos = 0.0  
 
         self.dxfViewerManual = DxfViewer(manual_profile_cut_widget=self.manualCuttingProfileWidget)   
+        self.manualCuttingProfileWidget.set_dxfViewer(self.dxfViewerManual)
 
         self.playManualBtn = Gtk.EventBox(can_focus=True)
         self.playManualBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))  
@@ -284,7 +288,7 @@ class DoubleMitreMachine(Gtk.Window):
         # Create CSV Viewer Widget
         self.csvViewerWidget = CSVViewerWidget(barWidget=self.barWidget, dxfViewerWidget=self.dxfViewer)
 
-        hBoxTreeview = Gtk.HBox()
+        hBoxTreeview = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         hBoxTreeview.set_name('hboxTreeview')
         hBoxTreeview.pack_start(self.csvViewerWidget,True,True,0)
 
@@ -311,7 +315,7 @@ class DoubleMitreMachine(Gtk.Window):
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
-#####       #Build Auto Cutting Page                                                                                               #####
+#####       #Build I/O Status Page                                                                                               #####
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
@@ -325,7 +329,7 @@ class DoubleMitreMachine(Gtk.Window):
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
-#####       #Build Auto Cutting Page                                                                                               #####
+#####       #Build Alarms Codes Page                                                                                               #####
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
@@ -339,7 +343,7 @@ class DoubleMitreMachine(Gtk.Window):
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
-#####       #Build Auto Cutting Page                                                                                               #####
+#####       #Build Settings Page                                                                                               #####
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
@@ -349,12 +353,36 @@ class DoubleMitreMachine(Gtk.Window):
         self.settingsPage.add(Gtk.Label(label="Settings Page!."))
         self.notebookPages.append_page(self.settingsPage) 
 
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       #Build Manage Dxf Page                                                                                               #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
+        self.manageDxfPage = Gtk.Box()
+        self.manageDxfPage.set_border_width(10)
+
+        self.dxfExplorer = DxfExplorer()
+
+        self.manageDxfPage.add(self.dxfExplorer)
+        self.notebookPages.append_page(self.manageDxfPage) 
+
+
+
+
         self.update_cmds_timer = GLib.timeout_add(self.update_rate_cmds, self.on_update_cmds_timeout)
         self.update_gui_timer = GLib.timeout_add(self.update_rate_gui, self.on_update_gui_timeout)
 
         self.add(vBoxMainStruct)
 
         self.hal_component.ready()
+
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       Main Page Logic Develop                                                                                                 #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
 
     def on_manualCutting_btn_pressed(self,widget,event):
         child = widget.get_child()    
@@ -384,11 +412,13 @@ class DoubleMitreMachine(Gtk.Window):
         child.set_from_file(filename="icons/step_slide_mode_icon.png")   
 
     def set_sensitive_btns_modes(self,gstat):
+        LogViewer().emit('public-msg', 'info', 'Info: Axis Homed...')
         self.manualCuttingBtn.set_sensitive(True)
         self.autoCuttingBtn.set_sensitive(True)
         self.stepSlideCuttingBtn.set_sensitive(True)
 
     def unset_sensitive_btns_modes(self,gstat,str):
+        LogViewer().emit('public-msg', 'warning', 'Warning: Not Axis Homed...')
         self.manualCuttingBtn.set_sensitive(False)
         self.autoCuttingBtn.set_sensitive(False)
         self.stepSlideCuttingBtn.set_sensitive(False) 
@@ -433,12 +463,33 @@ class DoubleMitreMachine(Gtk.Window):
         child = widget.get_child() 
         child.set_from_file(filename="icons/go_home_icon.png") 
 
+    def on_manageDxf_btn_pressed(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/step_slide_mode_icon_pressed.png")
+
+    def on_manageDxf_btn_released(self,widget,event):
+        self.notebookPages.set_current_page(self.pages['dxfExplorer'])
+        child = widget.get_child()
+        child.set_from_file(filename="icons/step_slide_mode_icon.png")
+
     def on_switch_page(self,notebook, page, page_num):
         if notebook == self.notebookPages:
             if page_num == self.pages['main']:
-                self.notebookFooter.set_current_page(0)
+                # self.notebookFooter.set_current_page(0)
+                self.goHomePageBtn.set_visible(False)
+                self.exitBtn.set_visible(True)
+                self.log_viewer.set_margin_start(self.goHomePageBtn.get_allocated_width())
+                self.log_viewer.set_margin_end(0)
             else:
-                self.notebookFooter.set_current_page(1)
+                # self.notebookFooter.set_current_page(1)
+                self.goHomePageBtn.set_visible(True)
+                self.exitBtn.set_visible(False)
+                self.log_viewer.set_margin_end(self.exitBtn.get_allocated_width())
+                self.log_viewer.set_margin_start(0)
+
+    def init_visible_goHomePageBtn_and_exitBtn(self):
+        self.goHomePageBtn.set_visible(False)
+        self.exitBtn.set_visible(True)
 
     def on_exit_btn_pressed(self,widget,event):
         child = widget.get_child()
@@ -536,10 +587,15 @@ class DoubleMitreMachine(Gtk.Window):
             self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 45)            
             self.angleLeftHeadManualState = angleHeadManualState['45']
         elif self.angleLeftHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/left_head_angle_135_icon.svg") 
-            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%135)
-            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 135)
-            self.angleLeftHeadManualState = angleHeadManualState['135'] 
+            if self.inside_angles == "YES":
+                child.set_from_file(filename="icons/left_head_angle_135_icon.svg") 
+                self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%135)
+                self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 135)
+                self.angleLeftHeadManualState = angleHeadManualState['135'] 
+            else:
+                child.set_from_file(filename="icons/left_head_angle_variable_icon.svg") 
+                self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(True)
+                self.angleLeftHeadManualState = angleHeadManualState['angle']
         elif self.angleLeftHeadManualState == angleHeadManualState['135']:
             child.set_from_file(filename="icons/left_head_angle_variable_icon.svg") 
             self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(True)
@@ -573,10 +629,15 @@ class DoubleMitreMachine(Gtk.Window):
             self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 45)             
             self.angleRightHeadManualState = angleHeadManualState['45']
         elif self.angleRightHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/right_head_angle_135_icon.svg")
-            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%135)
-            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 135)
-            self.angleRightHeadManualState = angleHeadManualState['135']
+            if self.inside_angles == "YES":
+                child.set_from_file(filename="icons/right_head_angle_135_icon.svg")
+                self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%135)
+                self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 135)
+                self.angleRightHeadManualState = angleHeadManualState['135']
+            else:
+                child.set_from_file(filename="icons/right_head_angle_variable_icon.svg")
+                self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(True)
+                self.angleRightHeadManualState = angleHeadManualState['angle']
         elif self.angleRightHeadManualState == angleHeadManualState['135']:
             child.set_from_file(filename="icons/right_head_angle_variable_icon.svg") 
             self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(True)
@@ -641,7 +702,7 @@ class DoubleMitreMachine(Gtk.Window):
     
 ##########################################################################################################################################
 #####                                                                                                                                #####
-#####       Automatic Mode Logic Develop                                                                                             #####
+#####       Positioning Logic Develop                                                                                             #####
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
@@ -670,8 +731,7 @@ class DoubleMitreMachine(Gtk.Window):
         return True
 
     def postgui(self):
-        inifile = linuxcnc.ini(self.ini_file)
-        postgui_halfile = inifile.find("HAL", "POSTGUI_HALFILE")
+        postgui_halfile = self.inifile.find("HAL", "POSTGUI_HALFILE")
         return postgui_halfile,sys.argv[2]
 
      
@@ -692,6 +752,7 @@ def main():
 
     win.connect("destroy", Gtk.main_quit)
     win.show_all()
+    win.init_visible_goHomePageBtn_and_exitBtn()
 
     Gtk.main()      
 

@@ -67,4 +67,17 @@
 	background: rgb(255,255,255);
 }
 
+#log_entry_row {
+    font-size: 32px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+}
+
+#log_row {
+    padding: 1px;
+    margin: 0;
+    border-width: 0;
+    min-height: 0;
+}
+
 

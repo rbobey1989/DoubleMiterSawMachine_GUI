@@ -1,6 +1,6 @@
 import gi, os
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, GdkPixbuf
+from gi.repository import Gtk
 
 class DxfExplorer(Gtk.Box):
     def __init__(self):
@@ -28,80 +28,40 @@ class DxfExplorer(Gtk.Box):
         vbox.pack_start(hbox_manufacturer_set, False, False, 0)
 
         # Create a ListStore model for the TreeView
-        self.treestore = Gtk.TreeStore(bool, GdkPixbuf.Pixbuf, str, str, str)
+        self.treestore = Gtk.TreeStore(bool, str, str, str)
         self.treeview = Gtk.TreeView(model=self.treestore)
-        self.treeview.set_name('listTreeview')
-        self.treeview.set_show_expanders(False)
-        self.treeview.set_level_indentation(16)
 
         # Get the Gtk.TreeSelection associated with the TreeView and set the mode to multiple
         self.treeview_selection = self.treeview.get_selection()
         self.treeview_selection.set_mode(Gtk.SelectionMode.MULTIPLE)
 
-        # Add a CellRendererToggle for the checkbox
-        renderer_pixbuf_check = Gtk.CellRendererPixbuf()
-        self.checked_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/check_icon.png")
-        self.unchecked_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/uncheck_icon.png")
-        
-        # Add a CellRendererPixbuf for the expander
-        renderer_pixbuf_expander = Gtk.CellRendererPixbuf()
-        self.expand_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/expand_icon.png")
-        self.collapse_pixbuf = GdkPixbuf.Pixbuf.new_from_file("icons/collapse_icon.png")
-
-        self.treeview.connect("button-press-event", self.on_row_clicked)
-
-        column_pixbuf = Gtk.TreeViewColumn("")
-
-        # Add both CellRendererPixbuf to the column
-        column_pixbuf.pack_start(renderer_pixbuf_expander, False)
-        column_pixbuf.pack_start(renderer_pixbuf_check, False)
-        
-        # Set the pixbuf attribute of the CellRendererPixbuf to the appropriate columns of the model
-        column_pixbuf.add_attribute(renderer_pixbuf_check, "pixbuf", 1)
-        column_pixbuf.add_attribute(renderer_pixbuf_expander, "pixbuf", 1)
-
-        def cell_func(column, cell, model, iter, data):
-            # Check if the row has children
-            if model.iter_has_child(iter):
-                # Get the path of the current row
-                path = model.get_path(iter)
-                # Check if the row is expanded
-                if self.treeview.row_expanded(path):
-                    # If the row is expanded, set the pixbuf to the collapse icon
-                    cell.set_property('pixbuf', self.collapse_pixbuf)
-                else:
-                    # If the row is not expanded, set the pixbuf to the expand icon
-                    cell.set_property('pixbuf', self.expand_pixbuf)
-            else:
-                # If the row does not have children, do not show the pixbuf
-                cell.set_property('pixbuf', None)
-
-        # Set the cell function for the renderer_pixbuf_expander
-        column_pixbuf.set_cell_data_func(renderer_pixbuf_expander, cell_func)
-
-        self.treeview.append_column(column_pixbuf)
-
+        # Create a TreeViewColumn with a CellRendererToggle for the checkboxes
+        self.checkbox_colum = Gtk.TreeViewColumn("Select")
+        self.treeview.append_column(self.checkbox_colum)
+        self.cellrenderertoggle = Gtk.CellRendererToggle()
+        self.checkbox_colum.pack_start(self.cellrenderertoggle, True)
+        self.checkbox_colum.add_attribute(self.cellrenderertoggle, "active", 0)
 
         # Create a TreeViewColumn for the Manufacturer Profile name
         self.treeview_column_manufacturer = Gtk.TreeViewColumn("Manufacturer")
         self.treeview.append_column(self.treeview_column_manufacturer)
         self.cellrenderertext = Gtk.CellRendererText()
         self.treeview_column_manufacturer.pack_start(self.cellrenderertext, True)
-        self.treeview_column_manufacturer.add_attribute(self.cellrenderertext, "text", 2)
+        self.treeview_column_manufacturer.add_attribute(self.cellrenderertext, "text", 1)
 
         # Create a TreeViewColumn for the Set Profile name
         self.treeview_column_set = Gtk.TreeViewColumn("Set")
         self.treeview.append_column(self.treeview_column_set)
         self.cellrenderertext = Gtk.CellRendererText()
         self.treeview_column_set.pack_start(self.cellrenderertext, True)
-        self.treeview_column_set.add_attribute(self.cellrenderertext, "text", 3)
+        self.treeview_column_set.add_attribute(self.cellrenderertext, "text", 2)
 
         # Create a TreeViewColumn for the DXF file names
         self.treeview_column_path = Gtk.TreeViewColumn("DXF Files")
         self.treeview.append_column(self.treeview_column_path)
         self.cellrenderertext = Gtk.CellRendererText()
         self.treeview_column_path.pack_start(self.cellrenderertext, True)
-        self.treeview_column_path.add_attribute(self.cellrenderertext, "text", 4)
+        self.treeview_column_path.add_attribute(self.cellrenderertext, "text", 3)
 
         # Create a ScrolledWindow
         self.scrolled_window = Gtk.ScrolledWindow(overlay_scrolling=False)
@@ -146,6 +106,9 @@ class DxfExplorer(Gtk.Box):
         self.ok_info_bar_btn = self.info_bar.add_button("OK", Gtk.ResponseType.OK)
 
         self.info_bar.connect("response", self.on_info_bar_response)
+
+        # Connect the CellRendererToggle to the callback function
+        self.cellrenderertoggle.connect("toggled", self.on_checkbox_toggled)
 
         self.hbox_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, homogeneous=True)
         self.hbox_buttons.pack_start(self.find_dxf_by_directories, False, False, 0)
@@ -265,39 +228,45 @@ class DxfExplorer(Gtk.Box):
         # Find the manufacturer in the TreeStore
         manufacturer_iter = None
         for row in self.treestore:
-            if row[2] == manufacturer:
+            if row[1] == manufacturer:
                 manufacturer_iter = row.iter
                 break
 
         # If the manufacturer is not found, add it to the TreeStore
         if manufacturer_iter is None:
-            manufacturer_iter = self.treestore.append(None, [True,self.checked_pixbuf, manufacturer, "", ""])
+            manufacturer_iter = self.treestore.append(None, [True, manufacturer, "", ""])
 
         # Find the set under the manufacturer
         set_iter = None
         for row in self.treestore[manufacturer_iter].iterchildren():
-            if row[3] == set:
+            if row[2] == set:
                 set_iter = row.iter
                 break
 
         # If the set is not found, create it under the manufacturer
         if set_iter is None:
-            set_iter = self.treestore.append(manufacturer_iter, [True,self.checked_pixbuf, "", set, ""])
+            set_iter = self.treestore.append(manufacturer_iter, [True, "", set, ""])
             
         # Check if the file is already in the ListStore
-        if not any(row[4] == filename for row in self.treestore):
-            self.treestore.append(set_iter,[True,
-                                    self.checked_pixbuf, 
+        if not any(row[3] == filename for row in self.treestore):
+            self.treestore.append(set_iter,[True, 
                                     "", 
                                     "",
                                     filename])
             
+
+    # def on_add_dxf_clicked(self, button):
+    #     pass
 
     def on_remove_dxf_clicked(self, button):
         # Get a list of TreePath for each row in the selection
         model, paths = self.treeview_selection.get_selected_rows()
 
         if len(paths) == 0:
+            # for btns in self.hbox_buttons.get_children():
+            #     btns.set_sensitive(False)
+            # self.label_info.set_text("!!!Error!!!!, Please select a DXF file to remove")
+            # self.ok_info_bar_btn.set_visible(True)
             self.show_info_warning_bar("!!!Error!!!!, Please select a DXF file to remove")
             return
 
@@ -306,84 +275,68 @@ class DxfExplorer(Gtk.Box):
             iter = model.get_iter(path)
             model.remove(iter)
 
-    def on_row_clicked(self, widget, event):
-        if event.button == 1:  # left mouse button
-            path_info = self.treeview.get_path_at_pos(int(event.x), int(event.y))
-            if path_info is not None:
-                path, col, cell_x, cell_y = path_info
-                cell_area = self.treeview.get_cell_area(path, col)
-                if col == self.treeview.get_column(0):
-                    if cell_area.x <= cell_x <= cell_area.x + cell_area.width:
-                        # Divide the column in two parts
-                        if cell_x <= cell_area.x + cell_area.width / 2:
-                            # Get the model and iter from the path
-                            model = self.treeview.get_model()
-                            iter = model.get_iter(path)
-                            # Check if the row has children
-                            if model.iter_has_child(iter):
-                                # Check if the row is expanded
-                                if self.treeview.row_expanded(path):
-                                    # If the row is expanded, collapse it
-                                    self.treeview.collapse_row(path)
-                                else:
-                                    # If the row is not expanded, expand it
-                                    self.treeview.expand_row(path, False)
-                        else:
-                            self.on_row_activated(widget, path, col)
+    def on_checkbox_toggled(self, widget, path):
+        iter = self.treestore.get_iter(path)
+
+        # Value
+        value = not self.treestore.get_value(iter, 0)
+
+        # Change the checkbox of the parent
+        self.treestore.set_value(iter, 0, value)
+
+        if not self.treestore.iter_has_child(iter):
+
+            if value:
+                # If child is checked, check the parents
+                parent_iter = self.treestore.iter_parent(iter)
+                while parent_iter is not None:
+                    self.treestore.set_value(parent_iter, 0, value)
+                    parent_iter = self.treestore.iter_parent(parent_iter)
             else:
-                self.treeview.get_selection().unselect_all()
+                # If all child is unchecked, uncheck the parents
+                parent_iter = self.treestore.iter_parent(iter)
+                while parent_iter is not None:
+                    if any(row[0] for row in self.treestore[parent_iter].iterchildren()):
+                        break
+                    self.treestore.set_value(parent_iter, 0, value)
+                    parent_iter = self.treestore.iter_parent(parent_iter)
+            return
 
-    def on_row_activated(self, widget, path, column):
-        # Get the column index
-        column_index = self.treeview.get_columns().index(column)
+        # If we reach this point, the iter has children, so we change their checkboxes
+        child_index = 0
+        while True:
+            child_iter = self.treestore.iter_nth_child(iter, child_index)
+            if child_iter is None:
+                break  # No more children
 
-        # Only toggle the checkbox if the first column was clicked
-        if column_index == 0:
-            # Toggle the state of the clicked cell
-            self.treestore[path][0] = not self.treestore[path][0]
+            self.treestore.set_value(child_iter, 0, value)  # Change the checkbox of the set
 
-            # Update the GdkPixbuf.Pixbuf based on the new state
-            if self.treestore[path][0]:
-                self.treestore[path][1] = self.checked_pixbuf
-            else:
-                self.treestore[path][1] = self.unchecked_pixbuf
+            grandchild_index = 0
+            while True:
+                grandchild_iter = self.treestore.iter_nth_child(child_iter, grandchild_index)
+                if grandchild_iter is None:
+                    break  # No more grandchildren
 
-            # Get an iterator to the row
-            iter = self.treestore.get_iter(path)
+                self.treestore.set_value(grandchild_iter, 0, value)  # Change the checkbox of the dxf file
 
-            if self.treestore.iter_has_child(iter):
-                # This is a parent row, so update all child rows
-                self.update_children(iter, self.treestore[path][0], self.treestore[path][1])
+                grandchild_index += 1
 
-                    # Get the parent iterator
+            child_index += 1
+
+        # If the iter has parent and the value its true, we change the parent checkbox
+        if value:
             parent_iter = self.treestore.iter_parent(iter)
-
-            # If the row has a parent and all siblings are in the desired state, set the parent to the desired state
-            while parent_iter:
-                if self.are_all_children(parent_iter, self.treestore[path][0]):
-                    self.treestore[parent_iter][0] = self.treestore[path][0]
-                    self.treestore[parent_iter][1] = self.treestore[path][1]
+            while parent_iter is not None:
+                self.treestore.set_value(parent_iter, 0, value)
                 parent_iter = self.treestore.iter_parent(parent_iter)
-
-    def update_children(self, parent_iter, new_state, new_pixbuf):
-        for i in range(self.treestore.iter_n_children(parent_iter)):
-            child_iter = self.treestore.iter_nth_child(parent_iter, i)
-            self.treestore[child_iter][0] = new_state
-            self.treestore[child_iter][1] = new_pixbuf
-            if self.treestore.iter_has_child(child_iter):
-                self.update_children(child_iter, new_state, new_pixbuf)
-
-    def are_all_children(self, parent_iter, state):
-        for i in range(self.treestore.iter_n_children(parent_iter)):
-            child_iter = self.treestore.iter_nth_child(parent_iter, i)
-            if self.treestore[child_iter][0] != state:  # If the child's state is not the desired state
-                return False
-            if self.treestore.iter_has_child(child_iter):  # If the child has children
-                if not self.are_all_children(child_iter, state):  # If any grandchild's state is not the desired state
-                    return False
-        return True
-
-
+        else:
+            # If all child is unchecked, uncheck the parents
+            parent_iter = self.treestore.iter_parent(iter)
+            while parent_iter is not None:
+                if any(row[0] for row in self.treestore[parent_iter].iterchildren()):
+                    break
+                self.treestore.set_value(parent_iter, 0, value)
+                parent_iter = self.treestore.iter_parent(parent_iter)
 
     def on_info_bar_response(self, widget, response_id):
         if response_id == Gtk.ResponseType.OK:
