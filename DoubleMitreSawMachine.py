@@ -11,7 +11,9 @@ import linuxcnc
 from gladevcp.core import Info, Status, Action
 
 import hal
-from hal_glib import GStat
+# from hal_glib import GStat
+import hal_glib 
+
 
 from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget 
 from ProfileWidgets.BarWidget import BarWidget
@@ -42,11 +44,30 @@ class DoubleMitreMachine(Gtk.Window):
         css_provider.load_from_path('css_styles_sheets/style.css')
         Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-        self.hal_component = hal.component("DoubleMitreMachine")
+        self.hal_component = hal.component("DoubleMitreSawMachine")
+
         self.update_rate_cmds = 100
         self.update_rate_gui = 100
 
-        self.hal_pin_pos_fb = self.hal_component.newpin("pos-fb", hal.HAL_FLOAT, hal.HAL_IN)
+        ### Hal Pins ###
+
+        self.hal_pin_start_move = self.hal_component.newpin("start-move", hal.HAL_BIT, hal.HAL_IN)
+        self.hal_pin_move_to_length = self.hal_component.newpin("move-to-length", hal.HAL_FLOAT, hal.HAL_IN)
+
+        self.hal_pin_cut_length =self.hal_component.newpin("cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
+        self.hal_pin_cut_start = self.hal_component.newpin("cut-start", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_cut_status = self.hal_component.newpin("cut-status", hal.HAL_U32, hal.HAL_IN)
+
+        self.count_start_pulse = 0
+        self.start_pulse = False
+
+        self.hal_pin_start_move_trigger = hal_glib.GPin( self.hal_pin_start_move)
+        self.hal_pin_start_move_trigger.connect("value-changed", self.on_start_move_changed)
+
+        self.hal_pin_cut_status_trigger = hal_glib.GPin( self.hal_pin_cut_status)
+        self.hal_pin_cut_status_trigger.connect("value-changed", self.on_cut_status_changed)
+
+        ### End Hal Pins ###
 
         self.angleRightHeadManualState = 0
         self.angleLeftHeadManualState = 0
@@ -78,6 +99,36 @@ class DoubleMitreMachine(Gtk.Window):
 
         hBoxLogoHeader = Gtk.HBox()
         hBoxLogoHeader.pack_start(torneiroLogo,False,False,0)
+
+##########################################################################################
+#####                                                                                #####
+#####       #Build Test Buttons                                                      #####
+#####                                                                                #####
+##########################################################################################
+        self.leftBusyHandBtn =  Gtk.ToggleButton(name="testBtn",label="LeftBusyHandBtn")
+        self.rightBusyHandBtn = Gtk.ToggleButton(name="testBtn",label="RightBusyHandBtn")
+        self.clampsBtn =    Gtk.ToggleButton(name="testBtn",label="ClampsBtn")
+
+        self.hal_pin_rigth_hand_busy_btn = hal_glib.GPin( self.hal_component.newpin("rigth-hand-busy-btn", hal.HAL_BIT, hal.HAL_OUT))
+        self.hal_pin_left_hand_busy_btn = hal_glib.GPin( self.hal_component.newpin("left-hand-busy-btn", hal.HAL_BIT, hal.HAL_OUT))
+        self.hal_pin_clamps_btn = hal_glib.GPin( self.hal_component.newpin("clamps-btn", hal.HAL_BIT, hal.HAL_OUT))
+
+        self.leftBusyHandBtn.connect('toggled', self.on_toggle_button,self.hal_pin_left_hand_busy_btn)
+        self.rightBusyHandBtn.connect('toggled',self.on_toggle_button,self.hal_pin_rigth_hand_busy_btn)
+        self.clampsBtn.connect('toggled', self.on_toggle_button,self.hal_pin_clamps_btn)
+
+        hboxTestBtns = Gtk.HBox()
+        hboxTestBtns.pack_start(self.leftBusyHandBtn,False,False,0)
+        hboxTestBtns.pack_start(self.rightBusyHandBtn,False,False,0)
+        hboxTestBtns.pack_start(self.clampsBtn,False,False,0)
+
+##########################################################################################
+#####                                                                                #####
+#####       #End Build Test Buttons, Erase after test                                #####
+#####                                                                                #####
+##########################################################################################
+
+        hBoxLogoHeader.pack_start(hboxTestBtns,False,False,0)
 
         hBoxSecurityBtns = Gtk.HBox(spacing=50,homogeneous=True,name='securityBtns')
 
@@ -129,7 +180,7 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.homeAxisBtn = myBtnHomeAxisAction()
 
-        self.gstatModes = GStat()
+        self.gstatModes = hal_glib.GStat()
 
         self.manualCuttingBtn = Gtk.EventBox(sensitive=False)
         self.manualCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/manual_mode_icon.png"))                 
@@ -192,10 +243,27 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################      
 
-        self.inside_angles = self.inifile.find("TRAJ", "INSIDE_ANGLES") or "unknown"
+        self.inside_angles = self.inifile.find("DISPLAY", "INSIDE_ANGLES") or "unknown"
         max_angle = 90.0 if self.inside_angles == "NO" else ( 157.5 if self.inside_angles == "YES" else 90.0)
 
-        self.manualCuttingProfileWidget = ManualProfileCutWidget(self,max_angle=max_angle)  
+        self.profile_max_length = self.inifile.find("DISPLAY", "PROFILE_MAX_LIMIT") or "unknown"
+        self.profile_min_length = self.inifile.find("DISPLAY", "PROFILE_MIN_LIMIT") or "unknown"
+
+        try:
+            profile_max_length = float(self.profile_max_length)
+        except ValueError:
+            profile_max_length = 6500.0
+
+        try:
+            profile_min_length = float(self.profile_min_length)
+        except ValueError:
+            profile_min_length = 240.0
+
+        self.manualCuttingProfileWidget = ManualProfileCutWidget(self,
+                                                                 max_angle=max_angle,
+                                                                 max_length=profile_max_length,
+                                                                 min_length=profile_min_length)  
+        
         self.last_FbPos = 0.0  
 
         self.dxfViewerManual = DxfViewer(manual_profile_cut_widget=self.manualCuttingProfileWidget)   
@@ -412,13 +480,13 @@ class DoubleMitreMachine(Gtk.Window):
         child.set_from_file(filename="icons/step_slide_mode_icon.png")   
 
     def set_sensitive_btns_modes(self,gstat):
-        LogViewer().emit('public-msg', 'info', 'Info: Axis Homed...')
+        LogViewer().emit('public-msg', 'info', 'Info: All Axes Homed...')
         self.manualCuttingBtn.set_sensitive(True)
         self.autoCuttingBtn.set_sensitive(True)
         self.stepSlideCuttingBtn.set_sensitive(True)
 
-    def unset_sensitive_btns_modes(self,gstat,str):
-        LogViewer().emit('public-msg', 'warning', 'Warning: Not Axis Homed...')
+    def unset_sensitive_btns_modes(self,gstat,joint):
+        LogViewer().emit('public-msg', 'warning', 'Warning: %s Axis Not Homed...' % joint)
         self.manualCuttingBtn.set_sensitive(False)
         self.autoCuttingBtn.set_sensitive(False)
         self.stepSlideCuttingBtn.set_sensitive(False) 
@@ -513,7 +581,8 @@ class DoubleMitreMachine(Gtk.Window):
     def on_playManual_btn_pressed(self,widget,event):
         widget.grab_focus()
         child = widget.get_child()
-        child.set_from_file(filename="icons/play_icon_pressed.png")        
+        child.set_from_file(filename="icons/play_icon_pressed.png")   
+
 
     def on_playManual_btn_released(self,widget,event): 
         child = widget.get_child() 
@@ -528,8 +597,10 @@ class DoubleMitreMachine(Gtk.Window):
         self.alarmsBtn.set_sensitive(False)
         self.ioStatusBtn.set_sensitive(False)
         # self.goHomePageBtn.set_sensitive(False)
-        
-        self.G0_X(self.manualCuttingProfileWidget.get_bottomLengthProfile())
+
+        self.hal_pin_cut_length.set(self.manualCuttingProfileWidget.get_bottomLengthProfile())
+        self.start_pulse = True
+        #self.G0_X(self.manualCuttingProfileWidget.get_bottomLengthProfile())
 
     def G0_X(self, x):
         c = linuxcnc.command()  # Create a new instance of linuxcnc.command
@@ -541,6 +612,7 @@ class DoubleMitreMachine(Gtk.Window):
         c = linuxcnc.command()
         c.abort()
         c.wait_complete() 
+
 
     def on_stopManual_btn_pressed(self,widget,event):
         widget.grab_focus()
@@ -706,16 +778,52 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
+    def on_toggle_button(self, button, hal_pin):
+
+        if button.get_active():
+            hal_pin.set(True)
+        else:
+            hal_pin.set(False)
+
+    def on_cut_status_changed(self, hal_pin, data=None):
+        status = hal_pin.get()
+        self.handle_cut_status(status)
+
+    def on_start_move_changed(self, hal_pin, data=None):
+        if hal_pin.get() == 1:
+            print("Start Move")
+            length = self.hal_pin_move_to_length.get()
+            c = linuxcnc.command()  # Create a new instance of linuxcnc.command
+            fail, self.manualPremode = ACTION.ensure_mode(linuxcnc.MODE_MDI)
+            command = "G0 X%.2f" % length
+            c.mdi('%s' % command)
+        
+
+
+    def handle_cut_status(self, status):
+        switcher = {
+            0: lambda: print('init_status'),
+            1: lambda: LogViewer().emit('public-msg', 'info', 'Info: Press BihandBtn...'),
+            2: lambda: LogViewer().emit('public-msg', 'info', 'Info: Close Clamps...'),
+            3: lambda: LogViewer().emit('public-msg', 'info', 'Info: Cut Complete...'),
+            4: lambda: LogViewer().emit('public-msg', 'info', 'Info: Short Cut...'),
+            5: lambda: LogViewer().emit('public-msg', 'info', 'Info: Normal Cut...'),
+            6: lambda: LogViewer().emit('public-msg', 'info', 'Info: Long Cut...'),
+        }
+        # Obtener la función correspondiente al estado
+        func = switcher.get(status, lambda: LogViewer().emit('public-msg', 'info', 'Info: Estado desconocido...'))
+        # Llamar a la función
+        func()
+
     def on_update_cmds_timeout(self):
 
-        # s = linuxcnc.stat()
-        # s.poll()
-        # in_position_flag = s.inpos  
-
-        # if in_position_flag:
-        #     print("In position")
-        # else:
-        #     print("Not in position")      
+        if self.start_pulse == True:
+            self.hal_pin_cut_start.set(True)
+            self.count_start_pulse += 1
+            if self.count_start_pulse == 2:
+                self.hal_pin_cut_start.set(False)
+                self.count_start_pulse = 0
+                self.start_pulse = False
 
         return True
     
@@ -729,6 +837,8 @@ class DoubleMitreMachine(Gtk.Window):
             self.last_FbPos = pos_fb_value
 
         return True
+    
+
 
     def postgui(self):
         postgui_halfile = self.inifile.find("HAL", "POSTGUI_HALFILE")

@@ -80,4 +80,21 @@
     min-height: 0;
 }
 
+#testBtn {
+    font-size: 20px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    /* Estilos adicionales para el botón en su estado normal */
+}
 
+#testBtn:active {
+    /* Estilos para cuando el botón está siendo presionado */
+    background: #4CAF50; /* Verde */
+    color: white;
+}
+
+#testBtn:checked, #testBtn.active {
+    /* Estilos para cuando el ToggleButton está activo/toggled */
+    background: #4CAF50; /* Verde */
+    color: white;
+}
