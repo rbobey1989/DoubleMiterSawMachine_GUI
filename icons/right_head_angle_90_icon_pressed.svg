@@ -30,7 +30,7 @@
      showgrid="false"
      showguides="true"
      inkscape:zoom="4"
-     inkscape:cx="139.5"
+     inkscape:cx="129.375"
      inkscape:cy="51"
      inkscape:window-width="1920"
      inkscape:window-height="1029"
@@ -73,7 +73,8 @@
        y1="0.95052207"
        x2="9.015748"
        y2="31.371679"
-       gradientUnits="userSpaceOnUse" />
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(1.0583333,0.52916667)" />
     <filter
        inkscape:collect="always"
        style="color-interpolation-filters:sRGB"
@@ -136,18 +137,17 @@
        id="rect13119"
        width="61.138855"
        height="30.780264"
-       x="2.5795803"
-       y="1.6667871"
+       x="3.6379137"
+       y="2.1959538"
        ry="2.3674064" />
     <rect
        style="display:inline;fill:url(#linearGradient13776);fill-opacity:1;stroke-width:0.550077;stroke-linecap:round;stroke-linejoin:round"
        id="rect1946"
        width="60.550789"
        height="30.421158"
-       x="2.0504038"
-       y="0.95052207"
-       ry="2.3397861"
-       transform="translate(0.52916667,0.52916667)" />
+       x="3.1087372"
+       y="1.4796888"
+       ry="2.3397861" />
     <g
        id="g5932"
        transform="matrix(-1,0,0,1,65.180761,0.52916667)">

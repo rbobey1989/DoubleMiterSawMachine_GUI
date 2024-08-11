@@ -63,8 +63,10 @@ class LogViewer(Gtk.ScrolledWindow, GObject.GObject):
             # Move the file pointer to the beginning of the file
             f.seek(0)
 
+            f_last_20_msgs = f.readlines()[-20:] 
+
             # Read the contents of the log file line by line
-            for line in f:
+            for line in f_last_20_msgs:
                 # Determine the type of the message and the message itself
                 message_type, message = line.split(":", 1)
 

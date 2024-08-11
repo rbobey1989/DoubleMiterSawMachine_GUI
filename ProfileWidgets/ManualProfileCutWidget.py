@@ -55,6 +55,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.topLengthProfile = 1000
         self.bottomLengthProfile = 1000
         self.heightProfile = 100
+        self.timeOutDisk = 5
+        self.numberOfCuts = 1
 
         self.focusTopLengthProfile = True
         self.focusBottomLengthProfile = False 
@@ -209,7 +211,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                   v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                   num_int_digits=3,
                                                   num_decimal_digits=0,
-                                                  init_value=0                                                
+                                                  init_value=self.numberOfCuts                                                
                                                   )                                               
         self.NumberOfCutsEntry.set_name('entryWithNumpadManualWidget')
         self.NumberOfCutsEntry.set_can_focus(True)
@@ -234,7 +236,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
                                                   v_align_bubbleNumpad=Gtk.ArrowType.UP,
                                                   num_int_digits=3,
                                                   num_decimal_digits=1,
-                                                  init_value=0                                                                                            
+                                                  init_value=self.timeOutDisk                                                                                           
                                                   )                                               
         self.TimeOutDiskEntry.set_name('entryWithNumpadManualWidget')
         self.TimeOutDiskEntry.set_can_focus(True)
@@ -304,6 +306,19 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
     def set_FbPos(self,length):
         self.FbPosEntry.set_text('%.*f'%(self.FbPosEntry.get_num_decimal_digits(),length))
+
+    def set_timeOutDisk(self,time):
+        self.timeOutDisk = time
+
+    def get_timeOutDisk(self):
+        return self.timeOutDisk
+    
+    def set_numberOfCuts(self,cuts):
+        self.numberOfCuts = cuts
+        self.NumberOfCutsEntry.set_text('%.*f'%(self.NumberOfCutsEntry.get_num_decimal_digits(),self.numberOfCuts))
+
+    def get_numberOfCuts(self):
+        return self.numberOfCuts
 
     def on_draw(self, widget, ctx):        
 
@@ -590,6 +605,12 @@ class ManualProfileCutWidget(Gtk.Overlay):
             self.set_heightProfile(value)
             self.dxfViewer.emit('clear-dxf')
             entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.heightProfile))
+        elif entry == self.TimeOutDiskEntry:
+            self.set_timeOutDisk(value)
+            entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.timeOutDisk))
+        elif entry == self.NumberOfCutsEntry:
+            self.set_numberOfCuts(value)
+            entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.numberOfCuts))
 
         self.updateLengths()
         self.queue_draw()  
@@ -601,7 +622,6 @@ class ManualProfileCutWidget(Gtk.Overlay):
         elif self.focusBottomLengthProfile == True:
             self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
             self.topLengthProfileEntry.set_text('%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),self.topLengthProfile))
-
     def set_dxfViewer(self,dxfViewer):
         self.dxfViewer = dxfViewer
 

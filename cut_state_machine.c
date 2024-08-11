@@ -1,6 +1,9 @@
 #include "rtapi.h"          // API para la parte en tiempo real
 #include "rtapi_app.h"      // API para la parte en tiempo real
 #include "hal.h"            // API de HAL
+#include "math.h"           // Librería de funciones matemáticas
+#include <stdint.h>
+#include <stdbool.h>
 
 #define MODNAME "cut_state_machine" // Nombre del módulo
 #define PREFIX "cut_sm"             // Prefijo para los pines
@@ -12,38 +15,117 @@ MODULE_LICENSE("GPL v2");
 static int num_instances = 1; // Número de instancias del componente
 
 typedef struct {
+    uint8_t out;
+    bool both;
+    bool in_edge;
+    int pulse_count;
+    uint32_t out_width_pulses;
+    uint8_t last_in;
+    bool first;
+} edge_detector_t;
 
-    hal_u32_t max_limit;            // Límite máximo de la máquina
-    hal_u32_t min_limit;            // Límite mínimo de la máquina
+typedef struct {
 
-    hal_bit_t *reset;               // Entrada de reset
+    hal_u32_t   max_limit;                  // Límite máximo de la máquina
+    hal_u32_t   min_limit;                  // Límite mínimo de la máquina
+    hal_float_t ferror;                     // Entrada longitud de corte
+    hal_bit_t   angle_head_type_actuator;   // Tipo de actuador para posicionamiento de cabezales
+
+    hal_bit_t *estop;               // Entrada de estop
     hal_u32_t *status;              // Salida de estado
 
+    hal_float_t *pos_fb;            // Entrada longitud de corte
+
+    hal_bit_t   *in_pos;            // Entrada de realimentación de posición
     hal_float_t *cut_length;        // Entrada longitud de corte 
+    hal_float_t *cut_left_angle;    // Entrada Posición cabezal izquierdo
+    hal_float_t *cut_right_angle;   // Entrada Posición cabezal derecho
     hal_float_t *move_to_length;    // Salida de movimiento a
+    hal_bit_t   *start_cut;         // Entrada de inicio de corte
     hal_bit_t   *start_move;        // Salida de movimiento
-    unsigned int width_start_move_pulse; // Contador de pulsos de inicio de movimiento
-     
+    hal_bit_t   *stop_move;         // Entrada de paro de movimiento
+    hal_bit_t   *cut_complete;      // Salida de corte completo
 
-    hal_bit_t *start_cut;           // Entrada de inicio de corte
+    hal_bit_t           *left_saw_blade;                                          // Entrada para disco de corte izquierdo
+    edge_detector_t     rising_edge_detector_left_saw_blade_btn;                         // Estructura para deteccion de bordes de pulsador derecho de disco izquierdo
+    edge_detector_t     falling_edge_detector_left_saw_blade_btn;                         // Estructura para deteccion de bordes de pulsador derecho de disco izquierdo
+    hal_bit_t           edge_detector_left_saw_blade_btn_both;                    // Parametro seleccion de deteccion ambos flancos del pulsador derecho de disco izquierdo
+    hal_bit_t           edge_detector_left_saw_blade_btn_in_edge;                 // Parametro seleccion de flanco del pulsador derecho de disco izquierdo
+    hal_u32_t           edge_detector_left_saw_blade_btn_out_width_pulses;        // Parametro ancho de pulso de salida del pulsador derecho de disco izquierdo
+    hal_bit_t           *turn_on_left_saw_blade;                    // Salida del Edge Detector del pulsador derecho de disco izquierdo
+    hal_bit_t           *turn_off_left_saw_blade;                   // Salida del Edge Detector del pulsador derecho de disco izquierdo    
 
-    unsigned int state;     // Estado actual de la máquina de estados
-    unsigned int cut_length_value;  // Valor de longitud de corte 
-    unsigned int current_cut_type;      // Tipo de corte actual 
+    hal_bit_t           *right_saw_blade;                                         // Entrada para disco de corte derecho
+    edge_detector_t     rising_edge_detector_right_saw_blade_btn;                        // Estructura para deteccion de bordes de pulsador derecho de disco derecho
+    edge_detector_t     falling_edge_detector_right_saw_blade_btn;                        // Estructura para deteccion de bordes de pulsador derecho de disco derecho
+    hal_bit_t           edge_detector_right_saw_blade_btn_both;                   // Parametro seleccion de deteccion ambos flancos del pulsador derecho de disco derecho
+    hal_bit_t           edge_detector_right_saw_blade_btn_in_edge;                // Parametro seleccion de flanco del pulsador derecho de disco derecho
+    hal_u32_t           edge_detector_right_saw_blade_btn_out_width_pulses;       // Parametro ancho de pulso de salida del pulsador derecho de disco derecho
+    hal_bit_t           *turn_on_right_saw_blade;                   // Salida del Edge Detector del pulsador derecho de disco derecho
+    hal_bit_t           *turn_off_right_saw_blade;                  // Salida del Edge Detector del pulsador derecho de disco derecho
 
-    hal_bit_t *rigth_hand_button;   // Entrada pulsador derecho de manos ocupadas    
-    hal_bit_t *left_hand_button;    // Entrada pulsador izquierdo de manos ocupadas
-    hal_bit_t *clamps_button;       // Entrada pulsador de mordazas
-    hal_bit_t *rigth_clamp;         // Salidas para mordaza derecha
+    hal_bit_t           *clamps_button;                                           // Entrada pulsador de mordazas
+    edge_detector_t     rising_edge_detector_clamps_btn;                                 // Estructura para debounce de pulsador de mordazas
+    edge_detector_t     falling_edge_detector_clamps_btn;                                 // Estructura para debounce de pulsador de mordazas
+    hal_bit_t           edge_detector_clamps_btn_both;                            // Parametro seleccion de deteccion ambos flancos del pulsador de mordazas
+    hal_bit_t           edge_detector_clamps_btn_in_edge;                         // Parametro seleccion de flanco del pulsador de mordazas
+    hal_u32_t           edge_detector_clamps_btn_out_width_pulses;                // Parametro ancho de pulso de salida del pulsador de mordazas
+    bool                clamps_button_state;                                     // Valor del pulsador de mordazas
+    hal_bit_t           *left_turn_on_clamps;                            // Salida del Edge Detector del pulsador de mordazas
+    hal_bit_t           *left_turn_off_clamps;                           // Salida del Edge Detector del pulsador de mordazas
+    hal_bit_t           *right_turn_on_clamps;                            // Salida del Edge Detector del pulsador de mordazas
+    hal_bit_t           *right_turn_off_clamps;                           // Salida del Edge Detector del pulsador de mordazas
+
+
+    hal_float_t *saw_blade_output_time; // Tiempo de salida disco de corte
+    hal_u32_t   *number_of_cuts;           // Número de cortes
+
+    unsigned int delay_count;             // Contador de pulsos de inicio de movimiento
+    unsigned int delay_count_left_saw_blade;
+    unsigned int delay_count_right_saw_blade;
+    
+    unsigned int state;             // Estado actual de la máquina de estados
+    float        cut_length_value;  // Valor de longitud de corte 
+    unsigned int current_cut_type;  // Tipo de corte actual
+
+    float left_head_pos_value; // Valor de posición de cabezal izquierdo
+    float right_head_pos_value; // Valor de posición de cabezal derecho
+
+    bool init_left_cut;             // Inicio de corte izquierdo
+    bool init_right_cut;            // Inicio de corte derecho
+    bool end_cut;                   // Fin de corte
+
+    hal_bit_t           *right_hand_btn;                                    // Entrada pulsador derecho de manos ocupadas
+    edge_detector_t     rising_edge_detector_right_hand_btn;                // Estructura para deteccion de bordes de pulsador derecho de disco derecho
+    edge_detector_t     falling_edge_detector_right_hand_btn;               // Estructura para deteccion de bordes de pulsador derecho de disco derecho
+    hal_bit_t           edge_detector_right_hand_btn_both;                  // Parametro seleccion de deteccion ambos flancos del pulsador derecho de disco derecho
+    hal_bit_t           edge_detector_right_hand_btn_in_edge;               // Parametro seleccion de flanco del pulsador derecho de disco derecho
+    hal_u32_t           edge_detector_right_hand_btn_out_width_pulses;      // Parametro ancho de pulso de salida del pulsador derecho de disco derecho
+    bool                right_hand_btn_state;                               // Valor del pulsador derecho de manos ocupadas
+
+    hal_bit_t           *left_hand_btn;    // Entrada pulsador izquierdo de manos ocupadas
+    edge_detector_t     rising_edge_detector_left_hand_btn;                 // Estructura para deteccion de bordes de pulsador derecho de disco derecho
+    edge_detector_t     falling_edge_detector_left_hand_btn;                // Estructura para deteccion de bordes de pulsador derecho de disco derecho
+    hal_bit_t           edge_detector_left_hand_btn_both;                   // Parametro seleccion de deteccion ambos flancos del pulsador derecho de disco derecho
+    hal_bit_t           edge_detector_left_hand_btn_in_edge;                // Parametro seleccion de flanco del pulsador derecho de disco derecho
+    hal_u32_t           edge_detector_left_hand_btn_out_width_pulses;       // Parametro ancho de pulso de salida del pulsador derecho de disco derecho
+    bool                left_hand_btn_state;                                // Valor del pulsador izquierdo de manos ocupadas
+
+    hal_bit_t *right_clamp;         // Salidas para mordaza derecha
+
     hal_bit_t *left_clamp;          // Salidas para mordaza izquierda
-    hal_bit_t *rigth_head;          // Salidas para actuador neumático cabezal derecho
+    
+    hal_bit_t *right_head;          // Salidas para actuador neumático cabezal derecho
     hal_bit_t *left_head;           // Salidas para actuador neumático cabezal izquierdo
-    hal_bit_t *feed_hold;           // Salida para control de movimiento
-    hal_bit_t *feed_inhibit;        // Salida para control de movimiento
+    
+    hal_bit_t *left_saw_blade_output_move;    // Salida para movimiento de disco de corte izquierdo     
+    hal_bit_t *right_saw_blade_output_move;   // Salida para movimiento de disco de corte derecho
+
 } cut_state_machine_t;
 
-static cut_state_machine_t *cut_state_machine;
 
+static cut_state_machine_t *cut_state_machine;              // Estructura de la máquina de estados
+bool init_params_edge_detector = false;                             // Inicialización de parámetros de edge detector
 
 /* other globals */
 int comp_id; // Identificador del componente
@@ -51,27 +133,56 @@ static const char *modname = MODNAME;
 static const char 	*prefix = PREFIX;
 
 // Estados de la máquina de estados
-#define RESET -1
-#define IDLE 0
-#define REQUEST_USER_TO_PRESS_HANDS_BUSY_BUTTONS 1
-#define WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED 2
-
-#define SHORT_CUT 3
-
-
-#define NORMAL_CUT 4
-
-
-#define LONG_CUT 5
-
+#define RESET                                                                           -1
+#define IDLE                                                                            0
+#define REQUEST_USER_TO_PRESS_HANDS_BUSY_BUTTONS                                        1
+#define WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_START_MOVE                      2
+#define POSITIONING_HEAD_ANGLES                                                         3
+#define SHORT_CUT                                                                       4
+#define NORMAL_CUT                                                                      5
+#define LONG_CUT                                                                        6
+#define WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL                                         7
+#define WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL                                             8
+#define WAITING_FOR_MACHINE_IN_POSITION                                                 9
+#define WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED                                         10
+#define CHECK_VISUALLY_CONTROLLED_CONTROLLED_CUTTING_BY_THE_OPERATOR_OR_BY_TIME         11
+#define WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT                             12
+#define CUT_COMPLETE_SEND_PULSE                                                         13
+#define SELECT_CUT_TYPE                                                                 14
+#define SAW_BLADE_OUTPUT_CONTROLLED_BY_TIME                                             15
+#define SAW_BLADE_OUTPUT_CONTROLLED_BY_USER                                             16
 
 // Status
-#define PRESS_HANDS_BUSY_BUTTONS    1
-#define SHORT_CUT_TYPE              4
-#define NORMAL_CUT_TYPE             5
-#define LONG_CUT_TYPE               6
+#define PRESS_HANDS_BUSY_BUTTONS_FOR_MOVE                               1
+#define POSITION_PROFILE_AND_CLOSE_CLAMPS                               2
+#define CUT_COMPLETE                                                    3
+#define SHORT_CUT_TYPE                                                  4
+#define NORMAL_CUT_TYPE                                                 5
+#define LONG_CUT_TYPE                                                   6
+#define PRESS_BUSY_HANDS_BUTTONS_FOR_CUT                                7
+#define CLOSED_CLAMPS                                                   8
+#define OPENED_CLAMPS                                                   9
+#define POSITIONING_HEADS                                               10
+#define THERE_ARE_NO_PIECES_TO_CUT                                      11
+#define TURN_ON_SAW_BLADES_AND_PRESS_HANDS_BUSY_BUTTONS                 12
+#define CUT_ONLY_LEFT_SAW_BLADE                                         13
+#define CUT_ONLY_RIGHT_SAW_BLADE                                        14
+#define CUT_BOTH_SAW_BLADES                                             15
+#define CUT_CONTROLLED_BY_TIME                                          16
+#define CUT_CONTROLLED_BY_USER                                          17
 
-#define COUNT_START_MOVE_PULSE    100
+// Type Head Actuator
+#define PNEUMATIC_ACTUATOR 0
+#define SERVO_ACTUATOR 1
+
+#define COUNT_PULSE                         120
+#define COUNT_MSG                           100
+
+#define DEBOUNCE_MASK_RISING_EDGE 0x0F  // 00001111 en binario
+#define DEBOUNCE_MASK_FALLING_EDGE 0xF0  // 11110000 en binario
+#define DEBOUNCE_BITS 8     // Número de bits en el registro de desplazamiento
+
+
 
 
 /******************************************************************************
@@ -79,7 +190,10 @@ static const char 	*prefix = PREFIX;
 ******************************************************************************/
 
 void update_cut_state_machine(void *arg, long period);
+void edges_detection_update(void *arg, long period);
+uint8_t edge_detector(edge_detector_t *detector, uint8_t in_signal_value);
 
+/*****************************************************************************/
 // Función para inicializar el componente
 int rtapi_app_main(void) {
     char name[HAL_NAME_LEN + 1];
@@ -107,35 +221,185 @@ int rtapi_app_main(void) {
     retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->min_limit), comp_id, "%s.min-limit", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->reset), comp_id, "%s.reset", prefix);
+    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->ferror), comp_id, "%s.ferror", prefix);
     if (retval != 0) goto error;
-    //*(cut_state_machine->reset) = 0;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->angle_head_type_actuator), comp_id, "%s.angle-head-type-actuator", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->estop), comp_id, "%s.estop", prefix);
+    if (retval != 0) goto error;
+    //*(cut_state_machine->estop) = 0;
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->pos_fb), comp_id, "%s.pos-fb", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->in_pos), comp_id, "%s.in_pos", prefix);
+    if (retval != 0) goto error;
 
     retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->cut_length), comp_id, "%s.cut-length", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->cut_left_angle), comp_id, "%s.cut-left-angle", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->cut_right_angle), comp_id, "%s.cut-right-angle", prefix);
     if (retval != 0) goto error;
 
     retval = hal_pin_float_newf(HAL_OUT, &(cut_state_machine->move_to_length), comp_id, "%s.move-to-length", prefix);
     if (retval != 0) goto error;
     *(cut_state_machine->move_to_length) = 0;
 
-    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->start_move), comp_id, "%s.start-move", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_move), comp_id, "%s.start-move", prefix);
     if (retval != 0) goto error;
     *(cut_state_machine->start_move) = 0;
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->stop_move), comp_id, "%s.stop-move", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->cut_complete), comp_id, "%s.cut-complete", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->cut_complete) = 0;
 
     retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->start_cut), comp_id, "%s.start-cut", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->rigth_hand_button), comp_id, "%s.rigth-hand-button", prefix);
-    if (retval != 0) goto error;
-    //*(cut_state_machine->rigth_hand_button) = 0;
+    /*********************************************************************************************
+     *                     Inicializacion del pulsador derecho de manos ocupadas                 *
+     *********************************************************************************************/
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->left_hand_button), comp_id, "%s.left-hand-button", prefix);
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->right_hand_btn), comp_id, "%s.right-hand-btn", prefix);
     if (retval != 0) goto error;
-    //*(cut_state_machine->left_hand_button) = 0;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_right_hand_btn_both), comp_id, "%s.right-hand-btn-both", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_right_hand_btn_in_edge), comp_id, "%s.right-hand-btn-in-edge", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->edge_detector_right_hand_btn_out_width_pulses), comp_id, "%s.right-hand-btn-out-width-pulses", prefix);
+    if (retval != 0) goto error;
+
+    cut_state_machine->rising_edge_detector_right_hand_btn.first = true;
+    cut_state_machine->falling_edge_detector_right_hand_btn.first = true;
+
+    /*********************************************************************************************
+     *                     Inicializacion del pulsador izquierdo de manos ocupadas               *
+     *********************************************************************************************/
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->left_hand_btn), comp_id, "%s.left-hand-btn", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_left_hand_btn_both), comp_id, "%s.left-hand-btn-both", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_left_hand_btn_in_edge), comp_id, "%s.left-hand-btn-in-edge", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->edge_detector_left_hand_btn_out_width_pulses), comp_id, "%s.left-hand-btn-out-width-pulses", prefix);
+    if (retval != 0) goto error;
+
+    cut_state_machine->rising_edge_detector_left_hand_btn.first = true;
+    cut_state_machine->falling_edge_detector_left_hand_btn.first = true;
+
+    /*********************************************************************************************
+     *                     Inicializacion del pulsador de mordazas                                *
+     *********************************************************************************************/
 
     retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->clamps_button), comp_id, "%s.clamps-button", prefix);
     if (retval != 0) goto error;
-    //*(cut_state_machine->clamps_button) = 0;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_clamps_btn_both), comp_id, "%s.clamps-btn-both", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_clamps_btn_in_edge), comp_id, "%s.clamps-btn-in-edge", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->edge_detector_clamps_btn_out_width_pulses), comp_id, "%s.clamps-btn-out-width-pulses", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->left_turn_on_clamps), comp_id, "%s.left-turn-on-clamps", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->left_turn_on_clamps) = 0;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->left_turn_off_clamps), comp_id, "%s.left-turn-off-clamps", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->left_turn_off_clamps) = 0;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->right_turn_on_clamps), comp_id, "%s.right-turn-on-clamps", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->right_turn_on_clamps) = 0;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->right_turn_off_clamps), comp_id, "%s.right-turn-off-clamps", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->right_turn_off_clamps) = 0;
+
+    cut_state_machine->rising_edge_detector_clamps_btn.first = true;
+    cut_state_machine->falling_edge_detector_clamps_btn.first = true;
+    
+    /*********************************************************************************************
+     *                                                                                           *
+     *********************************************************************************************/
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->right_saw_blade), comp_id, "%s.right-saw-blade", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_right_saw_blade_btn_both), comp_id, "%s.right-saw-blade-btn-both", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_right_saw_blade_btn_in_edge), comp_id, "%s.right-saw-blade-btn-in-edge", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->edge_detector_right_saw_blade_btn_out_width_pulses), comp_id, "%s.right-saw-blade-btn-out-width-pulses", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->turn_on_right_saw_blade), comp_id, "%s.turn-on-right-saw_blade", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->turn_on_right_saw_blade) = 0;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->turn_off_right_saw_blade), comp_id, "%s.turn-off-right-saw_blade", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->turn_off_right_saw_blade) = 0;
+
+    cut_state_machine->rising_edge_detector_right_saw_blade_btn.first = true;
+    cut_state_machine->falling_edge_detector_right_saw_blade_btn.first = true;
+
+    /*********************************************************************************************
+     *                                                                                           *
+     *********************************************************************************************/
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->left_saw_blade), comp_id, "%s.left-saw-blade", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_left_saw_blade_btn_both), comp_id, "%s.left-saw-blade-btn-both", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_bit_newf(HAL_RW, &(cut_state_machine->edge_detector_left_saw_blade_btn_in_edge), comp_id, "%s.left-saw-blade-btn-in-edge", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->edge_detector_left_saw_blade_btn_out_width_pulses), comp_id, "%s.left-saw-blade-btn-out-width-pulses", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->turn_on_left_saw_blade), comp_id, "%s.turn-on-left-saw_blade", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->turn_on_left_saw_blade) = 0;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->turn_off_left_saw_blade), comp_id, "%s.turn-off-left-saw_blade", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->turn_off_left_saw_blade) = 0;
+
+    cut_state_machine->rising_edge_detector_left_saw_blade_btn.first = true;
+    cut_state_machine->falling_edge_detector_left_saw_blade_btn.first = true;
+
+    /*********************************************************************************************
+     *                                                                                           *
+     *********************************************************************************************/
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->saw_blade_output_time), comp_id, "%s.saw-blade-output-time", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->number_of_cuts), comp_id, "%s.number-of-cuts", prefix);
+    if (retval != 0) goto error;
 
     // Salidas
 
@@ -144,30 +408,34 @@ int rtapi_app_main(void) {
     *(cut_state_machine->status) = 0;
     cut_state_machine->state = IDLE;
 
-    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->rigth_clamp), comp_id, "%s.rigth-clamp", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->right_clamp), comp_id, "%s.right-clamp", prefix);
     if (retval != 0) goto error;
-    *(cut_state_machine->rigth_clamp) = 0;
+    *(cut_state_machine->right_clamp) = 0;
 
-    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->left_clamp), comp_id, "%s.left-clamp", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->left_clamp), comp_id, "%s.left-clamp", prefix);
     if (retval != 0) goto error;
     *(cut_state_machine->left_clamp) = 0;
 
-    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->rigth_head), comp_id, "%s.rigth-head", prefix);
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->right_head), comp_id, "%s.right-head", prefix);
     if (retval != 0) goto error;
-    *(cut_state_machine->rigth_head) = 0;
+    *(cut_state_machine->right_head) = 0;
 
     retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->left_head), comp_id, "%s.left-head", prefix);
     if (retval != 0) goto error;
     *(cut_state_machine->left_head) = 0;
 
-    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->feed_hold), comp_id, "%s.feed-hold", prefix);
-    if (retval != 0) goto error;
-    *(cut_state_machine->feed_hold) = 1;
+    /*********************************************************************************************
+     *                                                                                           *
+     *********************************************************************************************/
 
-    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->feed_inhibit), comp_id, "%s.feed-inhibit", prefix);
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->left_saw_blade_output_move), comp_id, "%s.left-saw-blade-output-move", prefix);
     if (retval != 0) goto error;
-    *(cut_state_machine->feed_inhibit) = 1;
-    
+    *(cut_state_machine->left_saw_blade_output_move) = 0;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->right_saw_blade_output_move), comp_id, "%s.right-saw-blade-output-move", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->right_saw_blade_output_move) = 0;
+
 
 	error:
 	if (retval < 0) {
@@ -187,6 +455,15 @@ int rtapi_app_main(void) {
 		hal_exit(comp_id);
     }
 
+    rtapi_snprintf(name, sizeof(name), "%s.edges-detection-update", prefix);
+    retval = hal_export_funct(name, edges_detection_update, cut_state_machine, 1, 0, comp_id);
+    if (retval != 0) {
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "%s: ERROR: update function export failed\n", modname);
+        hal_exit(comp_id);
+    }
+
+
     rtapi_print_msg(RTAPI_MSG_INFO, "%s: installed hal component\n", modname, num_instances);
     hal_ready(comp_id);
     return 0;
@@ -201,54 +478,113 @@ void update_cut_state_machine(void *arg, long period){
 
     cut_state_machine_t *cut_state_machine = (cut_state_machine_t *)arg;
 
-    if (!(*(cut_state_machine->reset))) {
+    if (!*(cut_state_machine->estop) || *(cut_state_machine->stop_move))
+    {
         *(cut_state_machine->status) = 0;
-        *(cut_state_machine->rigth_clamp) = 0;
+        *(cut_state_machine->right_clamp) = 0;
         *(cut_state_machine->left_clamp) = 0;
-        *(cut_state_machine->rigth_head) = 0;
+        *(cut_state_machine->right_head) = 0;
         *(cut_state_machine->left_head) = 0;
-        *(cut_state_machine->feed_hold) = 1;
-        *(cut_state_machine->feed_inhibit) = 1;
+        *(cut_state_machine->turn_on_left_saw_blade) = 0;
+        *(cut_state_machine->turn_on_right_saw_blade) = 0;
+        *(cut_state_machine->turn_off_left_saw_blade) = 0;
+        *(cut_state_machine->turn_off_right_saw_blade) = 0;
+        *(cut_state_machine->left_saw_blade_output_move) = 0;
+        *(cut_state_machine->right_saw_blade_output_move) = 0;
+        cut_state_machine->left_hand_btn_state = false;
+        cut_state_machine->right_hand_btn_state = false;
+        cut_state_machine->clamps_button_state = false;
+        cut_state_machine->init_left_cut = false;
+        cut_state_machine->init_right_cut = false;
+        *(cut_state_machine->start_move) = 0;
+        *(cut_state_machine->stop_move) = 0;
+
 
         cut_state_machine->state = IDLE;
     }
     else
-    {
+    {   
+
         switch (cut_state_machine->state)
         {
+            
             case IDLE: 
-                *(cut_state_machine->start_move) = 0;
-                if (*(cut_state_machine->start_cut)) 
+                if (*(cut_state_machine->number_of_cuts) > 0)
                 {
-                    cut_state_machine->cut_length_value = *(cut_state_machine->cut_length);
+                    if (*(cut_state_machine->start_cut))
+                    {
+                        if ((cut_state_machine->cut_length_value == *(cut_state_machine->cut_length)) && 
+                            (cut_state_machine->left_head_pos_value == *(cut_state_machine->cut_left_angle)) &&
+                            (cut_state_machine->right_head_pos_value == *(cut_state_machine->cut_right_angle)))
+                        {
+                            cut_state_machine->state = SELECT_CUT_TYPE;
+                        }
+                        else
+                        {
+                            cut_state_machine->cut_length_value = *(cut_state_machine->cut_length);
+                            cut_state_machine->left_head_pos_value = *(cut_state_machine->cut_left_angle);
+                            cut_state_machine->right_head_pos_value = *(cut_state_machine->cut_right_angle);
+                        
+                            if (cut_state_machine->cut_length_value < cut_state_machine->min_limit)
+                            {
+                                cut_state_machine->current_cut_type = SHORT_CUT;
+                            }
+                            else if (cut_state_machine->cut_length_value >= cut_state_machine->min_limit && cut_state_machine->cut_length_value <= cut_state_machine->max_limit)
+                            {
+                                cut_state_machine->current_cut_type = NORMAL_CUT;
+                            }
+                            else
+                            {
+                                cut_state_machine->current_cut_type = LONG_CUT;
+                            }
 
-                    if (cut_state_machine->cut_length_value < cut_state_machine->min_limit)
-                    {
-                        cut_state_machine->current_cut_type = SHORT_CUT;
+                            cut_state_machine->state = POSITIONING_HEAD_ANGLES;
+                        }
                     }
-                    else if (cut_state_machine->cut_length_value >= cut_state_machine->min_limit && cut_state_machine->cut_length_value <= cut_state_machine->max_limit)
+                }                     
+
+                break;   
+
+            case POSITIONING_HEAD_ANGLES:
+                if (cut_state_machine->angle_head_type_actuator == PNEUMATIC_ACTUATOR)
+                {
+                    if (cut_state_machine->left_head_pos_value != 90)
                     {
-                        cut_state_machine->current_cut_type = NORMAL_CUT;
+                        *(cut_state_machine->left_head) = 1;
                     }
                     else
                     {
-                        cut_state_machine->current_cut_type = LONG_CUT;
+                        *(cut_state_machine->left_head) = 0;
                     }
 
-                    cut_state_machine->state = REQUEST_USER_TO_PRESS_HANDS_BUSY_BUTTONS;
-                    
+                    if (cut_state_machine->right_head_pos_value != 90)
+                    {
+                        *(cut_state_machine->right_head) = 1;
+                    }
+                    else
+                    {
+                        *(cut_state_machine->right_head) = 0;
+                    }
+                }
+
+                cut_state_machine->left_hand_btn_state = false;
+                cut_state_machine->right_hand_btn_state = false;
+                *(cut_state_machine->status) = PRESS_HANDS_BUSY_BUTTONS_FOR_MOVE;
+                cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_START_MOVE;
+                break;          
+                
+            case WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_START_MOVE:
+                if (cut_state_machine->left_hand_btn_state && cut_state_machine->right_hand_btn_state)
+                {
+                    cut_state_machine->left_hand_btn_state = false;
+                    cut_state_machine->right_hand_btn_state = false;
+                    cut_state_machine->state = SELECT_CUT_TYPE;
                 }
                 break;
 
-            case REQUEST_USER_TO_PRESS_HANDS_BUSY_BUTTONS:
-                *(cut_state_machine->status) = PRESS_HANDS_BUSY_BUTTONS;
-                cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED;
-                break;
-                
-            case WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED:
-                if (!(*(cut_state_machine->rigth_hand_button)) && !(*(cut_state_machine->left_hand_button)))
-                {
-                    switch (cut_state_machine->current_cut_type)
+            case SELECT_CUT_TYPE:
+
+                switch (cut_state_machine->current_cut_type)
                     {
                         case SHORT_CUT:
                             *(cut_state_machine->status) = SHORT_CUT_TYPE;
@@ -263,24 +599,266 @@ void update_cut_state_machine(void *arg, long period){
                             cut_state_machine->state = LONG_CUT;
                             break;
                     }
-                }
-                break;
-
-            case SHORT_CUT:
 
                 break;
 
             case NORMAL_CUT:
+                // if ((fabs(*(cut_state_machine->pos_fb) - cut_state_machine->cut_length_value) > cut_state_machine->ferror) && !*(cut_state_machine->start_move))
+                // {
+                //     *(cut_state_machine->move_to_length) = cut_state_machine->cut_length_value;
+                //     *(cut_state_machine->start_move) = 1; 
+                // }
+
+                // if (*(cut_state_machine->start_move))
+                // {
+                //     cut_state_machine->delay_count++;
+                //     if (cut_state_machine->delay_count == COUNT_PULSE)
+                //     {
+                //         *(cut_state_machine->start_move) = 0;
+                //         cut_state_machine->delay_count = 0;
+                //         cut_state_machine->state = WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL;
+                //     }
+                // }
+                // else
+                // {
+                //     *(cut_state_machine->status) = POSITION_PROFILE_AND_CLOSE_CLAMPS;
+                //     cut_state_machine->delay_count++;
+                //     if (cut_state_machine->delay_count == COUNT_MSG)
+                //     {
+                //        cut_state_machine->delay_count = 0; 
+                //        cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
+                //     }
+                // }   
+
+                if ((fabs(*(cut_state_machine->pos_fb) - cut_state_machine->cut_length_value) > cut_state_machine->ferror) && !*(cut_state_machine->start_move))
+                {
                     *(cut_state_machine->move_to_length) = cut_state_machine->cut_length_value;
                     *(cut_state_machine->start_move) = 1; 
-                    cut_state_machine->width_start_move_pulse++;
-                    if (cut_state_machine->width_start_move_pulse == COUNT_START_MOVE_PULSE)
+                    cut_state_machine->state = WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL;
+                }
+
+                if (!*(cut_state_machine->start_move))
+                {
+                    *(cut_state_machine->status) = POSITION_PROFILE_AND_CLOSE_CLAMPS;
+                    cut_state_machine->delay_count++;
+                    if (cut_state_machine->delay_count == COUNT_MSG)
                     {
-                        cut_state_machine->state = IDLE;
-                        cut_state_machine->width_start_move_pulse = 0;
+                       cut_state_machine->delay_count = 0; 
+                       cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
                     }
-                    
+                }   
+
                 break;
+
+            case WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL:
+                if (!*(cut_state_machine->start_move))
+                {
+                    *(cut_state_machine->start_move) = 0;
+                    cut_state_machine->state = WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL;
+                }
+                break;
+
+            case WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL:
+                if (!(*(cut_state_machine->in_pos)))
+                {
+                    cut_state_machine->state = WAITING_FOR_MACHINE_IN_POSITION;
+                }
+                break;
+
+            case WAITING_FOR_MACHINE_IN_POSITION:
+                if (*(cut_state_machine->in_pos))
+                {
+                    *(cut_state_machine->status) = POSITION_PROFILE_AND_CLOSE_CLAMPS;
+                    cut_state_machine->delay_count++;
+                    if (cut_state_machine->delay_count == COUNT_MSG)
+                    {
+                        cut_state_machine->clamps_button_state = false;
+                        cut_state_machine->delay_count = 0;
+                        cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
+                    }
+                }
+                break;
+
+            case WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED:
+
+                if (cut_state_machine->clamps_button_state)
+                {
+                    cut_state_machine->clamps_button_state = false;
+                    cut_state_machine->left_hand_btn_state = false;
+                    cut_state_machine->right_hand_btn_state = false;
+                    *(cut_state_machine->status) = CLOSED_CLAMPS;
+                    cut_state_machine->delay_count++;
+                    if (cut_state_machine->delay_count == COUNT_MSG)
+                    {
+                        cut_state_machine->left_hand_btn_state = false;
+                        cut_state_machine->right_hand_btn_state = false;
+                        cut_state_machine->delay_count = 0; 
+                        *(cut_state_machine->status) = PRESS_BUSY_HANDS_BUTTONS_FOR_CUT;
+                        cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT;
+                    }
+                }
+                else
+                {
+                    *(cut_state_machine->status) = OPENED_CLAMPS;
+                    *(cut_state_machine->right_clamp) = 0;
+                    *(cut_state_machine->left_clamp) = 0;
+                }
+
+                break;
+
+            case WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT:
+
+                if (!(cut_state_machine->init_left_cut) && !(cut_state_machine->init_right_cut))
+                {
+                    if (cut_state_machine->left_hand_btn_state && cut_state_machine->right_hand_btn_state)
+                    {
+                        cut_state_machine->left_hand_btn_state = false;
+                        cut_state_machine->right_hand_btn_state = false;
+
+                        if (!(*(cut_state_machine->left_saw_blade)) && (*(cut_state_machine->right_saw_blade)))
+                        {
+                            *(cut_state_machine->status) = CUT_ONLY_RIGHT_SAW_BLADE;
+                            cut_state_machine->init_right_cut = true;
+                            cut_state_machine->init_left_cut = false;
+                        } 
+                        else if ((*(cut_state_machine->left_saw_blade)) && !(*(cut_state_machine->right_saw_blade)))
+                        {
+                            *(cut_state_machine->status) = CUT_ONLY_LEFT_SAW_BLADE;
+                            cut_state_machine->init_left_cut = true;
+                            cut_state_machine->init_right_cut = false;
+                        }
+                        else if (!(*(cut_state_machine->left_saw_blade)) && !(*(cut_state_machine->right_saw_blade)))
+                        {
+                            *(cut_state_machine->status) = TURN_ON_SAW_BLADES_AND_PRESS_HANDS_BUSY_BUTTONS;
+                            cut_state_machine->init_left_cut = false;
+                            cut_state_machine->init_right_cut = false;
+                        }
+                        else
+                        {
+                            *(cut_state_machine->status) = CUT_BOTH_SAW_BLADES;
+                            cut_state_machine->init_right_cut = true;
+                            cut_state_machine->init_left_cut = true;                            
+                        }
+
+                    }
+                }
+
+                if (cut_state_machine->init_left_cut || cut_state_machine->init_right_cut)
+                {
+                    cut_state_machine->end_cut = false;
+                    if (*(cut_state_machine->saw_blade_output_time) > 0)
+                    {
+                        *(cut_state_machine->status) = CUT_CONTROLLED_BY_TIME;
+                        cut_state_machine->delay_count++;
+                        if (cut_state_machine->delay_count == COUNT_MSG)
+                        {
+                            cut_state_machine->delay_count = 0;
+                            cut_state_machine->state = SAW_BLADE_OUTPUT_CONTROLLED_BY_TIME;
+                        }
+                    }
+                    else
+                    {
+                        *(cut_state_machine->status) = CUT_CONTROLLED_BY_USER;
+                        cut_state_machine->delay_count++;
+                        if (cut_state_machine->delay_count == COUNT_MSG)
+                        {
+                            cut_state_machine->delay_count = 0;
+                            cut_state_machine->state = SAW_BLADE_OUTPUT_CONTROLLED_BY_USER;
+                        }
+                    }
+                }
+
+                break;
+
+
+            case SAW_BLADE_OUTPUT_CONTROLLED_BY_TIME:
+
+                if (cut_state_machine->init_left_cut)
+                {
+                    *(cut_state_machine->left_saw_blade_output_move) = 1;
+                    cut_state_machine->delay_count_left_saw_blade++;
+                    if (cut_state_machine->delay_count_left_saw_blade == *(cut_state_machine->saw_blade_output_time))
+                    {
+                        cut_state_machine->delay_count_left_saw_blade = 0;
+                        *(cut_state_machine->left_saw_blade_output_move) = 0;
+                        cut_state_machine->init_left_cut = false;
+                        cut_state_machine->end_cut = true;
+                    }
+                }
+
+                if (cut_state_machine->init_right_cut)
+                {
+                    *(cut_state_machine->right_saw_blade_output_move) = 1;
+                    cut_state_machine->delay_count_right_saw_blade++;
+                    if (cut_state_machine->delay_count_right_saw_blade == *(cut_state_machine->saw_blade_output_time))
+                    {
+                        cut_state_machine->delay_count_right_saw_blade = 0;
+                        *(cut_state_machine->right_saw_blade_output_move) = 0;
+                        cut_state_machine->init_right_cut = false;
+                        cut_state_machine->end_cut = true;
+                    }
+                }
+
+                if (cut_state_machine->end_cut)
+                {
+                    cut_state_machine->end_cut = false;
+                    *(cut_state_machine->status) = CUT_COMPLETE;
+                    cut_state_machine->state = CUT_COMPLETE_SEND_PULSE;
+                }
+
+                break;
+
+            case SAW_BLADE_OUTPUT_CONTROLLED_BY_USER:
+
+                if (cut_state_machine->init_left_cut)
+                {
+                    if (cut_state_machine->left_hand_btn && cut_state_machine->right_hand_btn)
+                        *(cut_state_machine->left_saw_blade_output_move) = 1;
+                    
+                    if (cut_state_machine->falling_edge_detector_left_hand_btn.out || cut_state_machine->falling_edge_detector_right_hand_btn.out)
+                    {
+                        cut_state_machine->left_hand_btn_state = false;
+                        cut_state_machine->right_hand_btn_state = false;
+                        *(cut_state_machine->left_saw_blade_output_move) = 0;
+                        cut_state_machine->init_left_cut = false;
+                        cut_state_machine->end_cut = true;
+                    }
+                }
+
+                if (cut_state_machine->init_right_cut)
+                {
+                    if (cut_state_machine->right_hand_btn && cut_state_machine->left_hand_btn)
+                        *(cut_state_machine->right_saw_blade_output_move) = 1;
+                    
+                    if (cut_state_machine->falling_edge_detector_right_hand_btn.out || cut_state_machine->falling_edge_detector_left_hand_btn.out)
+                    {
+                        cut_state_machine->right_hand_btn_state = false;
+                        cut_state_machine->left_hand_btn_state = false;
+                        *(cut_state_machine->right_saw_blade_output_move) = 0;
+                        cut_state_machine->init_right_cut = false;
+                        cut_state_machine->end_cut = true;
+                    }
+                }
+
+                if (cut_state_machine->end_cut)
+                {
+                    cut_state_machine->end_cut = false;
+                    *(cut_state_machine->status) = CUT_COMPLETE;
+                    cut_state_machine->state = CUT_COMPLETE_SEND_PULSE;
+                }
+
+                break;
+
+            case CUT_COMPLETE_SEND_PULSE:
+                *(cut_state_machine->cut_complete) = 1;
+                cut_state_machine->state = SELECT_CUT_TYPE;
+                break;
+
+            
+            case SHORT_CUT:
+                
+                break;
+
 
             case LONG_CUT:
 
@@ -291,4 +869,126 @@ void update_cut_state_machine(void *arg, long period){
 
     
 
+}
+
+void edges_detection_update(void *arg, long period) {
+
+    cut_state_machine_t *cut_state_machine = (cut_state_machine_t *)arg;
+
+    if (!init_params_edge_detector) {
+
+        cut_state_machine->rising_edge_detector_right_saw_blade_btn.both = (bool)cut_state_machine->edge_detector_right_saw_blade_btn_both;
+        cut_state_machine->rising_edge_detector_right_saw_blade_btn.in_edge = (bool)cut_state_machine->edge_detector_right_saw_blade_btn_in_edge;
+        cut_state_machine->rising_edge_detector_right_saw_blade_btn.out_width_pulses = cut_state_machine->edge_detector_right_saw_blade_btn_out_width_pulses;
+
+        cut_state_machine->falling_edge_detector_right_saw_blade_btn.both = (bool)cut_state_machine->edge_detector_right_saw_blade_btn_both;
+        cut_state_machine->falling_edge_detector_right_saw_blade_btn.in_edge = !(bool)cut_state_machine->edge_detector_right_saw_blade_btn_in_edge;
+        cut_state_machine->falling_edge_detector_right_saw_blade_btn.out_width_pulses = cut_state_machine->edge_detector_right_saw_blade_btn_out_width_pulses;
+       
+        cut_state_machine->rising_edge_detector_left_saw_blade_btn.both = (bool)cut_state_machine->edge_detector_left_saw_blade_btn_both;
+        cut_state_machine->rising_edge_detector_left_saw_blade_btn.in_edge = (bool)cut_state_machine->edge_detector_left_saw_blade_btn_in_edge;
+        cut_state_machine->rising_edge_detector_left_saw_blade_btn.out_width_pulses = cut_state_machine->edge_detector_left_saw_blade_btn_out_width_pulses;
+       
+        cut_state_machine->falling_edge_detector_left_saw_blade_btn.both = (bool)cut_state_machine->edge_detector_left_saw_blade_btn_both;
+        cut_state_machine->falling_edge_detector_left_saw_blade_btn.in_edge = !(bool)cut_state_machine->edge_detector_left_saw_blade_btn_in_edge;
+        cut_state_machine->falling_edge_detector_left_saw_blade_btn.out_width_pulses = cut_state_machine->edge_detector_left_saw_blade_btn_out_width_pulses;   
+
+        cut_state_machine->rising_edge_detector_clamps_btn.both = (bool)cut_state_machine->edge_detector_clamps_btn_both;
+        cut_state_machine->rising_edge_detector_clamps_btn.in_edge = (bool)cut_state_machine->edge_detector_clamps_btn_in_edge;
+        cut_state_machine->rising_edge_detector_clamps_btn.out_width_pulses = cut_state_machine->edge_detector_clamps_btn_out_width_pulses;
+        
+        cut_state_machine->falling_edge_detector_clamps_btn.both = (bool)cut_state_machine->edge_detector_clamps_btn_both;
+        cut_state_machine->falling_edge_detector_clamps_btn.in_edge = !(bool)cut_state_machine->edge_detector_clamps_btn_in_edge;
+        cut_state_machine->falling_edge_detector_clamps_btn.out_width_pulses = cut_state_machine->edge_detector_clamps_btn_out_width_pulses;
+
+        cut_state_machine->rising_edge_detector_right_hand_btn.both = (bool)cut_state_machine->edge_detector_right_hand_btn_both;
+        cut_state_machine->rising_edge_detector_right_hand_btn.in_edge = (bool)cut_state_machine->edge_detector_right_hand_btn_in_edge;
+        cut_state_machine->rising_edge_detector_right_hand_btn.out_width_pulses = cut_state_machine->edge_detector_right_hand_btn_out_width_pulses;
+
+        cut_state_machine->falling_edge_detector_right_hand_btn.both = (bool)cut_state_machine->edge_detector_right_hand_btn_both;
+        cut_state_machine->falling_edge_detector_right_hand_btn.in_edge = !(bool)cut_state_machine->edge_detector_right_hand_btn_in_edge;
+        cut_state_machine->falling_edge_detector_right_hand_btn.out_width_pulses = cut_state_machine->edge_detector_right_hand_btn_out_width_pulses;
+
+        cut_state_machine->rising_edge_detector_left_hand_btn.both = (bool)cut_state_machine->edge_detector_left_hand_btn_both;
+        cut_state_machine->rising_edge_detector_left_hand_btn.in_edge = (bool)cut_state_machine->edge_detector_left_hand_btn_in_edge;
+        cut_state_machine->rising_edge_detector_left_hand_btn.out_width_pulses = cut_state_machine->edge_detector_left_hand_btn_out_width_pulses;
+
+        cut_state_machine->falling_edge_detector_left_hand_btn.both = (bool)cut_state_machine->edge_detector_left_hand_btn_both;
+        cut_state_machine->falling_edge_detector_left_hand_btn.in_edge = !(bool)cut_state_machine->edge_detector_left_hand_btn_in_edge;
+        cut_state_machine->falling_edge_detector_left_hand_btn.out_width_pulses = cut_state_machine->edge_detector_left_hand_btn_out_width_pulses;
+
+        init_params_edge_detector = true;
+    }
+
+    
+    *(cut_state_machine->turn_on_right_saw_blade) = edge_detector(&(cut_state_machine->rising_edge_detector_right_saw_blade_btn), 
+                                          *(cut_state_machine->right_saw_blade));
+
+    *(cut_state_machine->turn_off_right_saw_blade) = edge_detector(&(cut_state_machine->falling_edge_detector_right_saw_blade_btn),
+                                           *(cut_state_machine->right_saw_blade));
+
+    *(cut_state_machine->turn_on_left_saw_blade) = edge_detector(&(cut_state_machine->rising_edge_detector_left_saw_blade_btn),
+                                         *(cut_state_machine->left_saw_blade));
+
+    *(cut_state_machine->turn_off_left_saw_blade) = edge_detector(&(cut_state_machine->falling_edge_detector_left_saw_blade_btn),
+                                          *(cut_state_machine->left_saw_blade));
+
+    // Right Hand Button State Update
+
+    if (edge_detector(&(cut_state_machine->rising_edge_detector_right_hand_btn), *(cut_state_machine->right_hand_btn)))
+    {
+        cut_state_machine->right_hand_btn_state = true;
+    }
+    else if (edge_detector(&(cut_state_machine->falling_edge_detector_right_hand_btn), *(cut_state_machine->right_hand_btn)))
+    {
+        cut_state_machine->right_hand_btn_state = false;
+    }
+
+    // Left Hand Button State Update
+
+    if (edge_detector(&(cut_state_machine->rising_edge_detector_left_hand_btn), *(cut_state_machine->left_hand_btn)))
+    {
+        cut_state_machine->left_hand_btn_state = true;
+    }
+    else if (edge_detector(&(cut_state_machine->falling_edge_detector_left_hand_btn), *(cut_state_machine->left_hand_btn)))
+    {
+        cut_state_machine->left_hand_btn_state = false;
+    }
+
+    // Clamps button State Update
+
+    if (edge_detector(&(cut_state_machine->rising_edge_detector_clamps_btn), *(cut_state_machine->clamps_button)))
+    {
+        cut_state_machine->clamps_button_state = true;
+    }
+    else if (edge_detector(&(cut_state_machine->falling_edge_detector_clamps_btn), *(cut_state_machine->clamps_button)))
+    {
+        cut_state_machine->clamps_button_state = false;
+    }
+
+}
+
+uint8_t edge_detector(edge_detector_t *detector, uint8_t in_signal_value) {
+    int new_in = in_signal_value;  
+    if (detector->pulse_count > 0) {
+        detector->pulse_count--;
+    }
+    if (!detector->first) {
+        int rise = new_in && !detector->last_in;
+        int fall = !new_in && detector->last_in;
+        int desired_edge = detector->both ? rise || fall : detector->in_edge ? fall : rise;
+        if (desired_edge) {
+            detector->pulse_count = detector->out_width_pulses;
+            detector->out = 1;
+        } else if (detector->pulse_count > 0) {
+            detector->out = 1;
+        } else {
+            detector->pulse_count = 0;
+            detector->out = 0;
+        }
+    } else {
+        detector->first = false;
+    }
+    detector->last_in = new_in;
+    return detector->out;
 }

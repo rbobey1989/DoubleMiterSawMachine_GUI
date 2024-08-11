@@ -4,7 +4,7 @@ import gi
 # gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
-from gladevcp.hal_actions import EMC_ToggleAction_ESTOP,EMC_ToggleAction_Power,EMC_Action_Home,EMC_Action_Stop
+from gladevcp.hal_actions import EMC_ToggleAction_ESTOP,EMC_ToggleAction_Power,EMC_Action_Home, EMC_Action_UnHome,EMC_Action_Stop
 from hal_glib import GStat
 from LogViewer.LogViewer import LogViewer
 
