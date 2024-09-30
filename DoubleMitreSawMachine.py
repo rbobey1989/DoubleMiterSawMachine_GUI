@@ -50,6 +50,9 @@ class DoubleMitreMachine(Gtk.Window):
 
         ### Hal Pins ###
 
+        self.hal_pin_homing_start = self.hal_component.newpin("homing-start", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_homing_break_deactivate = self.hal_component.newpin("homing-break-deactivate", hal.HAL_BIT, hal.HAL_IN)
+
         self.hal_pin_stop_move = self.hal_component.newpin("stop-move", hal.HAL_BIT, hal.HAL_OUT)
 
         self.hal_pin_start_move = self.hal_component.newpin("start-move", hal.HAL_BIT, hal.HAL_IN)
@@ -65,8 +68,8 @@ class DoubleMitreMachine(Gtk.Window):
         self.hal_pin_cut_left_angle = self.hal_component.newpin("cut-left-angle", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_cut_right_angle = self.hal_component.newpin("cut-right-angle", hal.HAL_FLOAT, hal.HAL_OUT)
 
-        self.hal_pin_left_saw_blade = self.hal_component.newpin("left-saw-blade", hal.HAL_BIT, hal.HAL_OUT)
-        self.hal_pin_right_saw_blade = self.hal_component.newpin("right-saw-blade", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_left_saw_blade = self.hal_component.newpin("left-saw-blade-btn", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_right_saw_blade = self.hal_component.newpin("right-saw-blade-btn", hal.HAL_BIT, hal.HAL_OUT)
 
         self.hal_pin_saw_blade_output_time = self.hal_component.newpin("saw-blade-output-time", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_number_of_cuts = self.hal_component.newpin("number-of-cuts", hal.HAL_U32, hal.HAL_IO)
@@ -202,7 +205,8 @@ class DoubleMitreMachine(Gtk.Window):
 ##########################################################################################################################################      
 
 
-        self.homeAxisBtn = myBtnHomeAxisAction()
+        self.homeAxisBtn = myBtnHomeAxisAction(hal_pin_homing_start = self.hal_pin_homing_start, 
+                                               hal_pin_homing_break_deactivate = self.hal_pin_homing_break_deactivate)
 
         self.gstatModes = hal_glib.GStat()
 
@@ -268,7 +272,24 @@ class DoubleMitreMachine(Gtk.Window):
 ##########################################################################################################################################      
 
         self.inside_angles = self.inifile.find("DISPLAY", "INSIDE_ANGLES") or "unknown"
-        max_angle = 90.0 if self.inside_angles == "NO" else ( 157.5 if self.inside_angles == "YES" else 90.0)
+        self.custom_angles = self.inifile.find("DISPLAY", "CUSTOM_ANGLES") or "unknown"
+        max_angle = self.inifile.find("DISPLAY", "MAX_ANGLE") or "unknown"
+        min_angle = self.inifile.find("DISPLAY", "MIN_ANGLE") or "unknown"
+
+        if self.custom_angles == "YES":
+            max_angle = float(max_angle)
+            min_angle = float(min_angle)
+        elif self.custom_angles == "NO":
+            if self.inside_angles == "YES":
+                max_angle = 157.5
+            elif self.inside_angles == "NO":
+                max_angle = 90.0
+            else:
+                max_angle = 90.0
+            min_angle = 22.5  
+        else:
+            max_angle = 90.0
+            min_angle = 22.5      
 
         self.profile_max_length = self.inifile.find("DISPLAY", "PROFILE_MAX_LIMIT") or "unknown"
         self.profile_min_length = self.inifile.find("DISPLAY", "PROFILE_MIN_LIMIT") or "unknown"
@@ -397,20 +418,18 @@ class DoubleMitreMachine(Gtk.Window):
         vBoxAutoPage.pack_start(self.barWidget,True,True,0)
         vBoxAutoPage.set_child_packing(self.barWidget, False, False, 0, Gtk.PackType.START)
 
-        # Create Dxf Viewer Widget
-        self.dxfViewer = DxfViewer(hide_buttons=True)
-
         # Create CSV Viewer Widget
-        self.csvViewerWidget = CSVViewerWidget(barWidget=self.barWidget, dxfViewerWidget=self.dxfViewer)
+        self.csvViewerWidget = CSVViewerWidget(barWidget=self.barWidget, max_angle=max_angle, min_angle=min_angle)
 
-        hBoxTreeview = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        hBoxTreeview.set_name('hboxTreeview')
-        hBoxTreeview.pack_start(self.csvViewerWidget,True,True,0)
+        # Create Dxf Viewer Widget
+        self.dxfViewerAuto = DxfViewer(csv_viewer_widget=self.csvViewerWidget)
+
+        self.csvViewerWidget.set_dxfViewerWidget(self.dxfViewerAuto)
 
         hboxTreeviewDxfViewer = Gtk.HBox(spacing=10,homogeneous=False)
-        hboxTreeviewDxfViewer.pack_start(hBoxTreeview,True,True,0)
+        hboxTreeviewDxfViewer.pack_start(self.csvViewerWidget,True,True,0)
 
-        hboxTreeviewDxfViewer.pack_end(self.dxfViewer,False,False,0)
+        hboxTreeviewDxfViewer.pack_end(self.dxfViewerAuto,False,False,0)
 
         vBoxAutoPage.pack_start(hboxTreeviewDxfViewer,True,True,0)
 
@@ -812,36 +831,30 @@ class DoubleMitreMachine(Gtk.Window):
         response = fileChooserDialog.run()
         if response == Gtk.ResponseType.OK:
             self.csvViewerWidget.get_treestore().clear()
-            if not self.csvViewerWidget.validate_csv_format(fileChooserDialog.get_filename()):
-                error_dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
-                    Gtk.ButtonsType.OK, "Error")
-                error_dialog.format_secondary_text(
-                    f"Error: The file {fileChooserDialog.get_filename()} does not have the correct CSV format.")
-                error_dialog.run()
-                error_dialog.destroy()                
-            else:
-                print(f"The file {fileChooserDialog.get_filename()} has the correct CSV format.")
+            if self.csvViewerWidget.validate_csv_format(fileChooserDialog.get_filename()):
+                LogViewer().emit('public-msg', 'info', 'Info: "The file: ' + fileChooserDialog.get_filename() + 'has the correct CSV format.')
                 self.csvViewerWidget.load_csv(fileChooserDialog.get_filename())
 
         fileChooserDialog.destroy()
 
     def on_save_clicked(self, widget, event):
-        dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
-            Gtk.FileChooserAction.SAVE,
-            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+        # dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
+        #     Gtk.FileChooserAction.SAVE,
+        #     (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
 
-        response = dialog.run()
-        if response == Gtk.ResponseType.OK:
-            with open(dialog.get_filename(), 'w') as f:
-                writer = csv.writer(f)
-                self.csvViewerWidget.write_rows(writer, self.csvViewerWidget.get_treestore())
+        # response = dialog.run()
+        # if response == Gtk.ResponseType.OK:
+        #     with open(dialog.get_filename(), 'w') as f:
+        #         writer = csv.writer(f)
+        #         self.csvViewerWidget.write_rows(writer, self.csvViewerWidget.get_treestore())
 
-        dialog.destroy()
+        # dialog.destroy()
+        self.csvViewerWidget.on_save_csv_list()
 
     def on_delete_clicked(self, widget, event):
-        self.csvViewerWidget.get_treestore().clear()
+        self.csvViewerWidget.clear_csv()
         self.barWidget.update_bar([])
-        self.dxfViewer.clear_dxf()
+        self.dxfViewerAuto.clear_dxf()
     
 ##########################################################################################################################################
 #####                                                                                                                                #####
@@ -958,17 +971,17 @@ class DoubleMitreMachine(Gtk.Window):
             self.manualCuttingProfileWidget.set_FbPos(pos_fb_value)
             self.last_FbPos = pos_fb_value
 
-        e = linuxcnc.error_channel()
-        error = e.poll()
+        # e = linuxcnc.error_channel()
+        # error = e.poll()
 
-        if error:
-            kind, text = error
-            text = text.replace('\n', '. ')
-            if kind in (linuxcnc.NML_ERROR, linuxcnc.OPERATOR_ERROR):
-                typus = "error"
-            else:
-                typus = "info"
-            LogViewer().emit('public-msg', typus, typus+': '+text)
+        # if error:
+        #     kind, text = error
+        #     text = text.replace('\n', '. ')
+        #     if kind in (linuxcnc.NML_ERROR, linuxcnc.OPERATOR_ERROR):
+        #         typus = "error"
+        #     else:
+        #         typus = "info"
+        #     LogViewer().emit('public-msg', typus, typus+': '+text)
 
         return True
 

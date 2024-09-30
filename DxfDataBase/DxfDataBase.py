@@ -1,4 +1,5 @@
 import sqlite3
+import ezdxf
 
 class DxfDataBase:
     def __init__(self, db_path='dxf_database.db'):
@@ -55,6 +56,28 @@ class DxfDataBase:
             SELECT code FROM dxf_files_table WHERE manufacturer = ? AND "set" = ?
             ''', (manufacturer, set))
         return self.cursor.fetchall()
+    
+    def get_code_dimensions(self, manufacturer, set, code):
+
+        # Get the path of the dxf file
+        
+
+        try:
+            # Open the dxf file
+            filename = self.get_dxf_file(manufacturer, set, code)
+            dxf_doc = ezdxf.readfile(filename)
+        except:
+            return None, None
+
+        # Get the lower and upper limits of the model space
+        lower_limit = dxf_doc.header['$EXTMIN']
+        upper_limit = dxf_doc.header['$EXTMAX']
+
+        # Calculate and return the height and width of the profile
+        height = upper_limit[1] - lower_limit[1]
+        width = upper_limit[0] - lower_limit[0]
+
+        return height, width
     
     def close(self):
         self.conn.close()

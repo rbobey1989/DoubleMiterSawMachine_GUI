@@ -622,6 +622,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         elif self.focusBottomLengthProfile == True:
             self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
             self.topLengthProfileEntry.set_text('%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),self.topLengthProfile))
+    
     def set_dxfViewer(self,dxfViewer):
         self.dxfViewer = dxfViewer
 

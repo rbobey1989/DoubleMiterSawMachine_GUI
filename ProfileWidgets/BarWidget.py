@@ -15,16 +15,24 @@ class BarWidget(Gtk.DrawingArea):
 
     def update_bar(self, data):
         cuts = []
-        try:
-            self.bar_length = int(data[0][4])
-            for row in data[1:]:
-                do_cut = row[0]
-                distance = int(row[6]) / self.bar_length
-                angle1 = int(row[7])
-                angle2 = int(row[8])
-                cuts.append((do_cut, distance, angle1, angle2))
-            self.cuts = cuts
-        except:
+        if data:
+            try:
+                if not data or len(data[0]) < 5:
+                    print(data[0])
+                    raise ValueError('Data is empty or too short')
+                self.bar_length = float(data[0][4])
+                for row in data[1:]:
+                    if len(row) < 12:
+                        raise ValueError('Row is too short')
+                    do_cut = row[0]
+                    distance = float(row[7]) / self.bar_length
+                    angle1 = float(row[10])
+                    angle2 = float(row[11])
+                    cuts.append((do_cut, distance, angle1, angle2))
+                self.cuts = cuts
+            except Exception as e:
+                print(f'Error in BarWidget.update_bar: {e}')
+        else:
             self.bar_length = None
             self.cuts = []
         self.queue_draw()
@@ -59,15 +67,16 @@ class BarWidget(Gtk.DrawingArea):
             cut_width_angle1 = math.tan(math.radians(90 - angle1)) * height
             cut_width_angle2 = math.tan(math.radians(90 - angle2)) * height
 
-            if last_angle2 < 90:
+            if last_angle2 < 90 and last_angle2 > 22.5:
                 if angle1 > 90:
                     x = x + cut_width_angle1
                     accumulated_length = accumulated_length + cut_width_angle1
 
-            if last_angle2 > 90:
+            if last_angle2 > 90 and last_angle2 < 157.5:
                 if angle1 < 90:
                     x = x - cut_width_angle2
-                    accumulated_length = accumulated_length - cut_width_angle2  
+                    accumulated_length = accumulated_length - cut_width_angle2 
+
 
             last_angle2 = angle2
 
