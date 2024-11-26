@@ -56,7 +56,7 @@ class VirtualKeyboard(Gtk.Grid):
             hboxs.append(hbox)
 
         # Add the Enter button spanning multiple rows
-        enter_button = Gtk.Button(label='Enter',name='treeviewButton')
+        enter_button = Gtk.Button(label='Clear',name='treeviewButton',can_focus=False)
         enter_button.set_size_request(100, 100)  # Adjust size as needed
         enter_button.connect("clicked", self.on_key_clicked)
 

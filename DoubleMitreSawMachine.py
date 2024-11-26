@@ -293,6 +293,7 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.profile_max_length = self.inifile.find("DISPLAY", "PROFILE_MAX_LIMIT") or "unknown"
         self.profile_min_length = self.inifile.find("DISPLAY", "PROFILE_MIN_LIMIT") or "unknown"
+        self.profile_max_height = self.inifile.find("DISPLAY", "PROFILE_MAX_HEIGHT_LIMIT") or "unknown"
 
         try:
             profile_max_length = float(self.profile_max_length)
@@ -303,6 +304,11 @@ class DoubleMitreMachine(Gtk.Window):
             profile_min_length = float(self.profile_min_length)
         except ValueError:
             profile_min_length = 300.0
+
+        try:
+            profile_max_height = float(self.profile_max_height)
+        except ValueError:
+            profile_max_height = 300.0
 
         self.manualCuttingProfileWidget = ManualProfileCutWidget(self,
                                                                  max_angle=max_angle,
@@ -382,6 +388,8 @@ class DoubleMitreMachine(Gtk.Window):
         self.leftDiskManualBtn.connect('button-release-event',self.on_disk_manual_btn_released,self.leftDiskManualState)
         self.rightDiskManualBtn.connect('button-release-event',self.on_disk_manual_btn_released,self.rightDiskManualState)
 
+        self.manualCuttingProfileWidget.connect('bad-value', self.on_bad_value)
+
 ##########################################################################################################################################
 #####                                                                                                                                #####
 #####       #Build Auto Cutting Page                                                                                                #####
@@ -419,7 +427,12 @@ class DoubleMitreMachine(Gtk.Window):
         vBoxAutoPage.set_child_packing(self.barWidget, False, False, 0, Gtk.PackType.START)
 
         # Create CSV Viewer Widget
-        self.csvViewerWidget = CSVViewerWidget(barWidget=self.barWidget, max_angle=max_angle, min_angle=min_angle)
+        self.csvViewerWidget = CSVViewerWidget(barWidget=self.barWidget, 
+                                               max_angle=max_angle, 
+                                               min_angle=min_angle,
+                                               max_length=profile_max_length,
+                                               min_length=profile_min_length,
+                                               max_height=profile_max_height)
 
         # Create Dxf Viewer Widget
         self.dxfViewerAuto = DxfViewer(csv_viewer_widget=self.csvViewerWidget)
@@ -810,6 +823,13 @@ class DoubleMitreMachine(Gtk.Window):
             elif state[0] == diskManualState['on']:
                 child.set_from_file(filename="icons/disk_on_icon.png")
 
+    def on_bad_value(self, widget, value):
+        if value == True:
+            self.playManualBtn.set_sensitive(False)
+            LogViewer().emit('public-msg', 'warning', 'Warning: Bad Value...')
+        else:    
+            self.playManualBtn.set_sensitive(True)
+
 ##########################################################################################################################################
 #####                                                                                                                                #####
 #####       Automatic Mode Logic Develop                                                                                             #####
@@ -821,12 +841,25 @@ class DoubleMitreMachine(Gtk.Window):
         child.set_from_file(filename="icons/open_cut_list_csv_pressed.png")
 
     def on_open_btn_released(self, widget, event):
+
+        if self.csvViewerWidget.get_treestore() is not None and len(self.csvViewerWidget.get_treestore()) > 0:
+            dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
+            dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
+            dialog.get_style_context().add_class("dialog")
+            response = dialog.run()
+            dialog.destroy()
+            if response == Gtk.ResponseType.YES:
+                resp = self.csvViewerWidget.on_save_csv_list()
+                if resp == Gtk.ResponseType.CANCEL:
+                    return
+
         child = widget.get_child()
         child.set_from_file(filename="icons/open_cut_list_csv.png")
 
         fileChooserDialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
             Gtk.FileChooserAction.OPEN,
             (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        fileChooserDialog.get_style_context().add_class("dialog")
         
         response = fileChooserDialog.run()
         if response == Gtk.ResponseType.OK:

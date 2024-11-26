@@ -26,6 +26,13 @@
 	background: rgb(128, 132, 137);
 }
 
+/***********************************************************/
+/* Entries Styles */
+
+.entry-font-red {
+    color: red;
+}
+
 
 /***********************************************************/
 /* TreeView Styles */
@@ -84,29 +91,38 @@
 	background: rgb(255,255,255);
 }
 
-#treeviewButton {
+#treeviewButton, .dialog button {
 	color: rgb(63, 55, 55);
     font-size: 20px;
 }
 
-#treeviewButton:hover {
+#treeviewButton:hover, .dialog button:hover {
 	color: #FFF;
 	background: rgb(63, 55, 55);
 }
 
-#treeviewButton:active {
+#treeviewButton:active, #treeviewButton:checked, .dialog button:active{
 	color: #FFF;
 	background: rgb(233, 11, 11);	
 }
 
+.dialog button image{
+    opacity: 0;
+}
+
+.dialog title {
+    font-size: 24px;
+    font-weight: bold;
+}
+
 #labelIdicatorsEntryCsvCutData {
-    font-size: 42px;
+    font-size: 30px;
     color: white;
     text-shadow: 2px 2px 4px #000000;
 }
 
 #entryCsvCutData {
-    font-size: 42px;
+    font-size: 30px;
     background-color: white;
     caret-color:      white;
     border-width:     4px;
@@ -129,10 +145,6 @@
     min-height: 0;
 }
 
-
-
-
-
 #testBtn {
     font-size: 20px;
     padding-top: 0px;
@@ -151,3 +163,5 @@
     background: #4CAF50; /* Verde */
     color: white;
 }
+
+/***************************************************/

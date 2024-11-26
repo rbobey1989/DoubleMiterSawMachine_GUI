@@ -14,7 +14,8 @@ from .EntryWithNumpad import myAlign
 
 class ManualProfileCutWidget(Gtk.Overlay):
     __gsignals__ = {
-        'update-value': (GObject.SignalFlags.RUN_FIRST, None, (EntryNumpad,float))
+        'update-value': (GObject.SignalFlags.RUN_FIRST, None, (EntryNumpad,float)),
+        'bad-value': (GObject.SignalFlags.RUN_FIRST, None, (bool,))
     }
     def __init__(
         self, 
@@ -31,7 +32,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
         min_length : float = 240.00,
         max_length : float = 6500.00,            
         min_angle: float = 22.5,
-        max_angle: float = 157.5
+        max_angle: float = 157.5,
+        max_height: float = 300.0
         ):
         super(ManualProfileCutWidget, self).__init__() 
 
@@ -49,6 +51,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.max_length = max_length 
         self.min_angle = min_angle
         self.max_angle = max_angle
+        self.max_height = max_height
 
         self.lefTipAngle = 90
         self.rightTipAngle = 90
@@ -337,7 +340,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         css = str("""
         #entryWithNumpadManualWidget {
-            font-size: """+ str(int(PADDING_LINE*0.8)) +"""px;
+            font-size: """+ str(int(PADDING_LINE*0.6)) +"""px;
             background-color: white;
             caret-color:      white;
             border-width:     4px;
@@ -346,7 +349,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
         }
 
         #labelIdicatorsEntryWithNumpadManualWidget {
-            font-size: """+ str(int(PADDING_LINE*0.8)) +"""px;
+            font-size: """+ str(int(PADDING_LINE*0.6)) +"""px;
             color: white;
             text-shadow: 2px 2px 4px #000000;
         }
@@ -602,6 +605,8 @@ class ManualProfileCutWidget(Gtk.Overlay):
             else:
                 entry.set_text('%.*f'%(entry.get_num_decimal_digits(),get_sideLength(entry)))
         elif entry == self.HeightProfileEntry:
+            if value > self.max_height:
+                value = self.max_height
             self.set_heightProfile(value)
             self.dxfViewer.emit('clear-dxf')
             entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.heightProfile))
@@ -612,16 +617,39 @@ class ManualProfileCutWidget(Gtk.Overlay):
             self.set_numberOfCuts(value)
             entry.set_text('%.*f'%(entry.get_num_decimal_digits(),self.numberOfCuts))
 
-        self.updateLengths()
+        self.topLengthProfile,self.bottomLengthProfile = self.updateLengths()
+
+        if any([self.topLengthProfile < self.min_length,self.bottomLengthProfile < self.min_length]):
+            self.bottomLengthProfileEntry.get_style_context().add_class('entry-font-red')
+            self.topLengthProfileEntry.get_style_context().add_class('entry-font-red')
+            self.HeightProfileEntry.get_style_context().add_class('entry-font-red')
+            self.leftAngleProfileEntry.get_style_context().add_class('entry-font-red')
+            self.rightAngleProfileEntry.get_style_context().add_class('entry-font-red')
+            self.emit('bad-value',True)
+        else:
+            entry.get_style_context().remove_class('entry-font-red')
+            self.bottomLengthProfileEntry.get_style_context().remove_class('entry-font-red')
+            self.topLengthProfileEntry.get_style_context().remove_class('entry-font-red')
+            self.HeightProfileEntry.get_style_context().remove_class('entry-font-red')
+            self.leftAngleProfileEntry.get_style_context().remove_class('entry-font-red')
+            self.rightAngleProfileEntry.get_style_context().remove_class('entry-font-red')
+            self.emit('bad-value',False)
+                                                                        
         self.queue_draw()  
 
     def updateLengths(self): 
         if self.focusTopLengthProfile == True:
-            self.bottomLengthProfile = self.topLengthProfile - self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
-            self.bottomLengthProfileEntry.set_text('%.*f'%(self.bottomLengthProfileEntry.get_num_decimal_digits(),self.bottomLengthProfile))
+            bottomLengthProfile = self.topLengthProfile - self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
+            bottomLengthProfileStr = '%.*f'%(self.bottomLengthProfileEntry.get_num_decimal_digits(),bottomLengthProfile)
+            self.bottomLengthProfile = float(bottomLengthProfileStr)
+            self.bottomLengthProfileEntry.set_text(bottomLengthProfileStr)
         elif self.focusBottomLengthProfile == True:
-            self.topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
-            self.topLengthProfileEntry.set_text('%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),self.topLengthProfile))
+            topLengthProfile = self.bottomLengthProfile + self.heightProfile*(1/math.tan(math.radians(self.lefTipAngle))+1/math.tan(math.radians(self.rightTipAngle)))
+            topLengthProfileStr = '%.*f'%(self.topLengthProfileEntry.get_num_decimal_digits(),topLengthProfile)
+            self.topLengthProfile = float(topLengthProfileStr)
+            self.topLengthProfileEntry.set_text(topLengthProfileStr)
+
+        return self.topLengthProfile,self.bottomLengthProfile
     
     def set_dxfViewer(self,dxfViewer):
         self.dxfViewer = dxfViewer
