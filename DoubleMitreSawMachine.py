@@ -60,6 +60,9 @@ class DoubleMitreMachine(Gtk.Window):
 
 
         self.hal_pin_cut_start = self.hal_component.newpin("cut-start", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_cut_add = self.hal_component.newpin("cut-add", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_free_cut_list = self.hal_component.newpin("free-cut-list", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_print_cut_list = self.hal_component.newpin("print-cut-list", hal.HAL_BIT, hal.HAL_IO)
         self.hal_pin_cut_status = self.hal_component.newpin("cut-status", hal.HAL_U32, hal.HAL_IN)
 
         self.hal_pin_bottom_cut_length =self.hal_component.newpin("bottom-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
@@ -67,6 +70,9 @@ class DoubleMitreMachine(Gtk.Window):
         self.hal_pin_cut_height = self.hal_component.newpin("height-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_cut_left_angle = self.hal_component.newpin("cut-left-angle", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_cut_right_angle = self.hal_component.newpin("cut-right-angle", hal.HAL_FLOAT, hal.HAL_OUT)
+
+        self.hal_pin_cut_id_lower = self.hal_component.newpin("cut-id-lower", hal.HAL_U32, hal.HAL_IO)
+        self.hal_pin_cut_id_upper = self.hal_component.newpin("cut-id-upper", hal.HAL_U32, hal.HAL_IO)
 
         self.hal_pin_left_saw_blade = self.hal_component.newpin("left-saw-blade-btn", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_right_saw_blade = self.hal_component.newpin("right-saw-blade-btn", hal.HAL_BIT, hal.HAL_OUT)
@@ -81,6 +87,9 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.count_stop_pulse = [0]
         self.stop_pulse = [False]
+
+        self.count_cut_add_pulse = [0]
+        self.cut_add_pulse = [False]
 
         self.hal_pin_start_move_trigger = hal_glib.GPin( self.hal_pin_start_move)
         self.hal_pin_start_move_trigger.connect("value-changed", self.on_start_move_changed)
@@ -402,27 +411,53 @@ class DoubleMitreMachine(Gtk.Window):
         self.openListBtn.add(Gtk.Image.new_from_file(filename="icons/open_cut_list_csv.png"))  
 
         self.saveListBtn = Gtk.EventBox(can_focus=True)
-        self.saveListBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png"))   
+        self.saveListBtn.add(Gtk.Image.new_from_file(filename="icons/save_cut_list_csv.png"))   
 
         self.clearListBtn = Gtk.EventBox(can_focus=True)
-        self.clearListBtn.add(Gtk.Image.new_from_file(filename="icons/left_head_angle_90_icon.png"))  
+        self.clearListBtn.add(Gtk.Image.new_from_file(filename="icons/clear_cut_list_csv.png")) 
+
+        self.playListBtn = Gtk.EventBox(can_focus=True)
+        self.playListBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))
+
+        self.stopListBtn = Gtk.EventBox(can_focus=True)
+        self.stopListBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png")) 
 
         self.openListBtn.connect('button-press-event',self.on_open_btn_pressed)
         self.openListBtn.connect('button-release-event',self.on_open_btn_released)
 
-        self.saveListBtn.connect('button-press-event',self.on_save_clicked)
-        self.clearListBtn.connect('button-press-event',self.on_delete_clicked) 
+        #self.saveListBtn.connect('button-press-event',self.on_save_clicked)
+        self.saveListBtn.connect('button-press-event',self.on_save_btn_pressed)
+        self.saveListBtn.connect('button-release-event',self.on_save_btn_released)
 
-        hBoxAutoListBtns = Gtk.HBox(homogeneous=True)
-        hBoxAutoListBtns.pack_start(self.openListBtn,False,False,0)
-        hBoxAutoListBtns.pack_start(self.saveListBtn,False,False,0)
-        hBoxAutoListBtns.pack_end(self.clearListBtn,False,False,0)
+        #self.clearListBtn.connect('button-press-event',self.on_delete_clicked) 
+        self.clearListBtn.connect('button-press-event',self.on_clear_btn_pressed)
+        self.clearListBtn.connect('button-release-event',self.on_clear_btn_released)
+
+        self.playListBtn.connect('button-press-event',self.on_play_btn_pressed)
+        self.playListBtn.connect('button-release-event',self.on_play_btn_released)
+
+        self.stopListBtn.connect('button-press-event',self.on_stop_btn_pressed)
+        self.stopListBtn.connect('button-release-event',self.on_stop_btn_released)
+
+        hBoxAutoListLeftBtns = Gtk.HBox(homogeneous=True)
+        hBoxAutoListLeftBtns.pack_start(self.openListBtn,False,False,0)
+        hBoxAutoListLeftBtns.pack_start(self.saveListBtn,False,False,0)
+        hBoxAutoListLeftBtns.pack_end(self.clearListBtn,False,False,0)
+
+        hBoxAutoListRightBtns = Gtk.HBox(homogeneous=True)
+        hBoxAutoListRightBtns.pack_end(self.stopListBtn,False,False,0)
+        hBoxAutoListRightBtns.pack_end(self.playListBtn,False,False,0)
+
+        hboxAutoListBtns = Gtk.HBox(homogeneous=False)
+        hboxAutoListBtns.pack_start(hBoxAutoListLeftBtns,False,False,0)
+        hboxAutoListBtns.pack_end(hBoxAutoListRightBtns,False,False,0)
 
         self.barWidget = BarWidget()
         self.barWidget.set_size_request(-1, 35)
         self.barWidget.set_margin_start(10)
         self.barWidget.set_margin_end(10)
-        vBoxAutoPage.pack_start(hBoxAutoListBtns,False,False,0)
+
+        vBoxAutoPage.pack_start(hboxAutoListBtns,False,False,0)
         vBoxAutoPage.pack_start(self.barWidget,True,True,0)
         vBoxAutoPage.set_child_packing(self.barWidget, False, False, 0, Gtk.PackType.START)
 
@@ -513,9 +548,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.manageDxfPage.add(self.dxfExplorer)
         self.notebookPages.append_page(self.manageDxfPage) 
-
-
-
 
         self.update_cmds_timer = GLib.timeout_add(self.update_rate_cmds, self.on_update_cmds_timeout)
         self.update_gui_timer = GLib.timeout_add(self.update_rate_gui, self.on_update_gui_timeout)
@@ -870,25 +902,95 @@ class DoubleMitreMachine(Gtk.Window):
 
         fileChooserDialog.destroy()
 
-    def on_save_clicked(self, widget, event):
-        # dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
-        #     Gtk.FileChooserAction.SAVE,
-        #     (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+    def on_save_btn_pressed(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/save_cut_list_csv_pressed.png")
 
-        # response = dialog.run()
-        # if response == Gtk.ResponseType.OK:
-        #     with open(dialog.get_filename(), 'w') as f:
-        #         writer = csv.writer(f)
-        #         self.csvViewerWidget.write_rows(writer, self.csvViewerWidget.get_treestore())
+    def on_save_btn_released(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/save_cut_list_csv.png")
 
-        # dialog.destroy()
         self.csvViewerWidget.on_save_csv_list()
 
-    def on_delete_clicked(self, widget, event):
+
+    # def on_save_clicked(self, widget, event):
+    #     # dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
+    #     #     Gtk.FileChooserAction.SAVE,
+    #     #     (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+
+    #     # response = dialog.run()
+    #     # if response == Gtk.ResponseType.OK:
+    #     #     with open(dialog.get_filename(), 'w') as f:
+    #     #         writer = csv.writer(f)
+    #     #         self.csvViewerWidget.write_rows(writer, self.csvViewerWidget.get_treestore())
+
+    #     # dialog.destroy()
+    #     self.csvViewerWidget.on_save_csv_list()
+
+    # def on_delete_clicked(self, widget, event):
+    #     self.csvViewerWidget.clear_csv()
+    #     self.barWidget.update_bar([])
+    #     self.dxfViewerAuto.clear_dxf()
+
+    def on_clear_btn_pressed(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/clear_cut_list_csv_pressed.png")
+    
+    def on_clear_btn_released(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/clear_cut_list_csv.png")
+
         self.csvViewerWidget.clear_csv()
         self.barWidget.update_bar([])
         self.dxfViewerAuto.clear_dxf()
-    
+
+    def on_play_btn_pressed(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/play_icon_pressed.png")
+
+    def on_play_btn_released(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/play_icon.png")
+
+        selected_rows = self.csvViewerWidget.get_selected_child_rows()
+
+        if len(selected_rows) == 0:
+            LogViewer().emit('public-msg', 'warning', 'Warning: No row selected...')
+            return
+        
+        if self.hal_pin_free_cut_list.get() == False:
+            self.hal_pin_free_cut_list.set(True)
+            while (self.hal_pin_free_cut_list.get() == True):{}
+        
+        for row in selected_rows:
+            
+            while (self.hal_pin_cut_add.get() == True):{}
+
+            self.hal_pin_top_cut_length.set(self.csvViewerWidget.get_treestore().get_value(row, 8))
+            self.hal_pin_bottom_cut_length.set(self.csvViewerWidget.get_treestore().get_value(row, 9))
+            self.hal_pin_cut_height.set(self.csvViewerWidget.get_treestore().get_value(row, 10))
+            self.hal_pin_cut_left_angle.set(self.csvViewerWidget.get_treestore().get_value(row, 11))
+            self.hal_pin_cut_right_angle.set(self.csvViewerWidget.get_treestore().get_value(row, 12))
+            self.hal_pin_cut_id_lower.set(id(row) & 0x00000000FFFFFFFF)
+            self.hal_pin_cut_id_upper.set((id(row) >> 32) & 0x00000000FFFFFFFF)
+            print(f'python id: {id(row)}')
+
+            self.hal_pin_cut_add.set(True)
+
+
+
+
+    def on_stop_btn_pressed(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/stop_icon_pressed.png")
+
+    def on_stop_btn_released(self, widget, event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/stop_icon.png")
+
+        if self.hal_pin_print_cut_list.get() == False:
+            self.hal_pin_print_cut_list.set(True)
+
 ##########################################################################################################################################
 #####                                                                                                                                #####
 #####       Positioning Logic Develop                                                                                             #####

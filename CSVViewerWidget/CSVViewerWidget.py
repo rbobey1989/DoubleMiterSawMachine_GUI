@@ -540,12 +540,23 @@ class CSVViewerWidget(Gtk.Notebook):
             db.close()
 
     def clear_csv(self):
-        self.treestore.clear()
-        self.titleBar.set_text('')
-        if self.barWidget != None:
-            self.barWidget.update_bar([])
-        if self.dxfViewerWidget != None:
-            self.dxfViewerWidget.clear_dxf()
+        if self.treestore is not None and len(self.treestore) > 0:
+            dialog = Gtk.MessageDialog(self.get_toplevel_window(), 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
+            dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
+            dialog.get_style_context().add_class('dialog')
+            response = dialog.run()
+            dialog.destroy()
+            if response == Gtk.ResponseType.YES:
+                resp = self.on_save_csv_list()
+                if resp == Gtk.ResponseType.CANCEL:
+                    return
+            else:
+                self.treestore.clear()
+                self.titleBar.set_text('')
+                if self.barWidget != None:
+                    self.barWidget.update_bar([])
+                if self.dxfViewerWidget != None:
+                    self.dxfViewerWidget.clear_dxf()
 
 
     def on_row_clicked(self, widget, event):
@@ -748,6 +759,23 @@ class CSVViewerWidget(Gtk.Notebook):
         
         return None, None
     
+    def get_selected_child_rows(self):
+
+        selected_rows = []
+        model = self.treestore
+        iter = model.get_iter_first()
+
+        while iter is not None:
+            if model.iter_has_child(iter):
+                child_iter = model.iter_children(iter)
+                while child_iter is not None:
+                    if model.get_value(child_iter, 0):
+                        selected_rows.append(child_iter)
+                    child_iter = model.iter_next(child_iter)
+            iter = model.iter_next(iter)
+
+        return selected_rows
+    
     def set_dxfViewerWidget(self, dxfViewerWidget):
         self.dxfViewerWidget = dxfViewerWidget
 
@@ -760,16 +788,16 @@ class CSVViewerWidget(Gtk.Notebook):
         widget.set_editable(False)
         
     def on_new_csv_list(self, widget):
-        if self.treestore is not None and len(self.treestore) > 0:
-            dialog = Gtk.MessageDialog(self.get_toplevel_window(), 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
-            dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
-            dialog.get_style_context().add_class('dialog')
-            response = dialog.run()
-            dialog.destroy()
-            if response == Gtk.ResponseType.YES:
-                resp = self.on_save_csv_list()
-                if resp == Gtk.ResponseType.CANCEL:
-                    return
+        # if self.treestore is not None and len(self.treestore) > 0:
+        #     dialog = Gtk.MessageDialog(self.get_toplevel_window(), 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
+        #     dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
+        #     dialog.get_style_context().add_class('dialog')
+        #     response = dialog.run()
+        #     dialog.destroy()
+        #     if response == Gtk.ResponseType.YES:
+        #         resp = self.on_save_csv_list()
+        #         if resp == Gtk.ResponseType.CANCEL:
+        #             return
         self.clear_csv()
         self.titleBar.set_editable(True)
         self.titleBar.set_can_focus(True)
@@ -784,6 +812,10 @@ class CSVViewerWidget(Gtk.Notebook):
         return widget
     
     def on_save_csv_list(self):
+        if self.treestore is None or len(self.treestore) == 0:
+            LogViewer().emit('public-msg', 'warning', 'Warning: There is no data to save.')
+            return Gtk.ResponseType.CANCEL
+        
         dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self.get_toplevel_window(),
         Gtk.FileChooserAction.SAVE,
         (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
@@ -997,7 +1029,10 @@ class CSVViewerWidget(Gtk.Notebook):
             self.topLengthEntry.set_text(topLengthProfileStr)
 
     def on_del_line_csv_list(self, widget):
-        pass
+        model, iter = self.get_active_row()
+        if model is not None and iter is not None:
+            model.remove(iter)
+
 
     def on_clear_csv(self, widget):
         self.clear_csv()

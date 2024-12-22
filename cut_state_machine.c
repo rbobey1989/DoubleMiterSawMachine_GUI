@@ -24,6 +24,16 @@ typedef struct {
     bool first;
 } edge_detector_t;
 
+typedef struct cut{
+    float bottom_cut_length;
+    float top_cut_length;
+    float height_cut_length;
+    float cut_left_angle;
+    float cut_right_angle;
+    uint64_t cut_id;
+    struct cut *next;
+} cut_t;
+
 typedef struct {
 
     hal_u32_t           max_limit;                                  // Límite máximo de la máquina
@@ -41,10 +51,19 @@ typedef struct {
 
     hal_float_t         *pos_fb;                                    // Entrada longitud de corte
 
+    cut_t               *head;
+    cut_t               *tail;
+    uint32_t            list_num_cuts;
+    hal_bit_t           *cut_add;
+    hal_u32_t           *cut_id_lower;
+    hal_u32_t           *cut_id_upper;
+    hal_bit_t           *free_cut_list;
+    hal_bit_t           *print_cut_list;
+
     hal_bit_t           *in_pos;                                    // Entrada de realimentación de posición
     hal_float_t         *bottom_cut_length;                         // Entrada longitud de corte inferior
     hal_float_t         *top_cut_length;                            // Entrada longitud de corte superior
-    hal_float_t         *height_cut_length;                                // Entrada altura de corte
+    hal_float_t         *height_cut_length;                         // Entrada altura de corte
     hal_float_t         *cut_left_angle;                            // Entrada Posición cabezal izquierdo
     hal_float_t         *cut_right_angle;                           // Entrada Posición cabezal derecho
     hal_float_t         *move_to_length;                            // Salida de movimiento a
@@ -199,6 +218,10 @@ void update_cut_state_machine(void *arg, long period);
 void edges_detection_update(void *arg, long period);
 uint8_t edge_detector(edge_detector_t *detector, uint8_t in_signal_value);
 
+void add_cut_list(void *arg, long period);
+void clear_cut_list(void *arg, long period);
+void print_list(void *arg, long period);
+
 /*****************************************************************************/
 // Función para inicializar el componente
 int rtapi_app_main(void) {
@@ -277,6 +300,25 @@ int rtapi_app_main(void) {
     *(cut_state_machine->cut_complete) = 0;
 
     retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->start_cut), comp_id, "%s.start-cut", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->cut_add), comp_id, "%s.cut-add", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IO, &(cut_state_machine->cut_id_upper), comp_id, "%s.cut-id-upper", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IO, &(cut_state_machine->cut_id_lower), comp_id, "%s.cut-id-lower", prefix);
+    if (retval != 0) goto error;
+
+    cut_state_machine->head = NULL;
+    cut_state_machine->tail = NULL;
+    cut_state_machine->list_num_cuts = 0;
+
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->free_cut_list), comp_id, "%s.free-cut-list", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->print_cut_list), comp_id, "%s.print-cut-list", prefix);
     if (retval != 0) goto error;
 
     /*********************************************************************************************
@@ -433,6 +475,30 @@ int rtapi_app_main(void) {
         hal_exit(comp_id);
     }
 
+    rtapi_snprintf(name, sizeof(name), "%s.add-cut-list", prefix);
+    retval = hal_export_funct(name, add_cut_list, cut_state_machine, 1, 0, comp_id);
+    if (retval != 0) {
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "%s: ERROR: update function export failed\n", modname);
+        hal_exit(comp_id);
+    }
+
+    rtapi_snprintf(name, sizeof(name), "%s.clear-cut-list", prefix);
+    retval = hal_export_funct(name, clear_cut_list, cut_state_machine, 1, 0, comp_id);
+    if (retval != 0) {
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "%s: ERROR: update function export failed\n", modname);
+        hal_exit(comp_id);
+    }
+
+    rtapi_snprintf(name, sizeof(name), "%s.print-list", prefix);   
+    retval = hal_export_funct(name, print_list, cut_state_machine, 1, 0, comp_id);
+    if (retval != 0) {
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "%s: ERROR: update function export failed\n", modname);
+        hal_exit(comp_id);
+    }
+
 
     rtapi_print_msg(RTAPI_MSG_INFO, "%s: installed hal component\n", modname, num_instances);
     hal_ready(comp_id);
@@ -503,22 +569,21 @@ void update_cut_state_machine(void *arg, long period){
             
             case IDLE:
 
-                cut_state_machine->number_of_cuts_value = *(cut_state_machine->number_of_cuts);
 
-                if (cut_state_machine->number_of_cuts_value > 0)
-                {
+
                     if (*(cut_state_machine->start_cut))
                     {
-                        if ((cut_state_machine->bottom_cut_length_value == *(cut_state_machine->bottom_cut_length)) && 
-                            (cut_state_machine->top_cut_length_value == *(cut_state_machine->top_cut_length)) &&
-                            (cut_state_machine->height_cut_value == *(cut_state_machine->height_cut_length)) &&
-                            (cut_state_machine->left_head_pos_value == *(cut_state_machine->cut_left_angle)) &&
-                            (cut_state_machine->right_head_pos_value == *(cut_state_machine->cut_right_angle)))
-                        {
-                            cut_state_machine->state = SELECT_CUT_TYPE;
-                        }
-                        else
-                        {
+                        cut_state_machine->number_of_cuts_value = *(cut_state_machine->number_of_cuts);
+                        // if ((cut_state_machine->bottom_cut_length_value == *(cut_state_machine->bottom_cut_length)) && 
+                        //     (cut_state_machine->top_cut_length_value == *(cut_state_machine->top_cut_length)) &&
+                        //     (cut_state_machine->height_cut_value == *(cut_state_machine->height_cut_length)) &&
+                        //     (cut_state_machine->left_head_pos_value == *(cut_state_machine->cut_left_angle)) &&
+                        //     (cut_state_machine->right_head_pos_value == *(cut_state_machine->cut_right_angle)))
+                        // {
+                        //     cut_state_machine->state = SELECT_CUT_TYPE;
+                        // }
+                        // else
+                        // {
                             cut_state_machine->bottom_cut_length_value = *(cut_state_machine->bottom_cut_length);
                             cut_state_machine->top_cut_length_value = *(cut_state_machine->top_cut_length);
                             cut_state_machine->height_cut_value = *(cut_state_machine->height_cut_length);
@@ -540,8 +605,7 @@ void update_cut_state_machine(void *arg, long period){
 
                             cut_state_machine->state = POSITIONING_HEAD_ANGLES;
                         }
-                    }
-                }                     
+                    //}                   
 
                 break;   
 
@@ -1254,3 +1318,69 @@ uint8_t edge_detector(edge_detector_t *detector, uint8_t in_signal_value) {
     detector->last_in = new_in;
     return detector->out;
 }
+
+void add_cut_list(void *arg, long period) {
+
+    uint64_t cut_id;
+
+    if (*(cut_state_machine->cut_add) == 1) {
+        // cut_state_machine->head = NULL;
+        // cut_state_machine->tail = NULL;
+        // cut_state_machine->list_num_cuts = 0;
+        cut_t *new_cut = hal_malloc(sizeof(cut_t));
+        if (new_cut == NULL) {
+            rtapi_print_msg(RTAPI_MSG_ERR, "ERROR: malloc failed\n");
+            return;
+        }
+        new_cut->bottom_cut_length = *(cut_state_machine->bottom_cut_length);
+        new_cut->top_cut_length = *(cut_state_machine->top_cut_length);
+        new_cut->height_cut_length = *(cut_state_machine->height_cut_length);
+        new_cut->cut_left_angle = *(cut_state_machine->cut_left_angle);
+        new_cut->cut_right_angle = *(cut_state_machine->cut_right_angle);
+        new_cut->cut_id = (uint64_t)*(cut_state_machine->cut_id_lower) & 0x00000000FFFFFFFF;
+        new_cut->cut_id |= ((uint64_t)*(cut_state_machine->cut_id_upper) << 32) & 0xFFFFFFFF00000000;
+        new_cut->next = NULL;
+
+        if (cut_state_machine->tail == NULL) {
+            cut_state_machine->head = new_cut;
+            cut_state_machine->tail = new_cut;
+        } else {
+            cut_state_machine->tail->next = new_cut;
+            cut_state_machine->tail = new_cut;
+        }
+        cut_state_machine->list_num_cuts++;
+        *(cut_state_machine->cut_add) = 0;
+    }
+}
+
+void clear_cut_list(void *arg, long period) {
+    if (*(cut_state_machine->free_cut_list) == 1) {
+        cut_state_machine->head = NULL;
+        cut_state_machine->tail = NULL;
+        cut_state_machine->list_num_cuts = 0;
+        *(cut_state_machine->free_cut_list) = 0;
+        }
+}
+
+
+void print_list(void *arg, long period) {
+    cut_t *current = cut_state_machine->head;
+    if (*(cut_state_machine->print_cut_list)) {
+        rtapi_print("List of cuts:\n");
+
+        while (current != NULL) {
+            rtapi_print("---------------------------------------------\n");
+            rtapi_print("Cut ID: %lu\n", current->cut_id);
+            rtapi_print("Bottom cut length: %f\n", current->bottom_cut_length);
+            rtapi_print("Top cut length: %f\n", current->top_cut_length);
+            rtapi_print("Height cut length: %f\n", current->height_cut_length);
+            rtapi_print("Left head angle: %f\n", current->cut_left_angle);
+            rtapi_print("Right head angle: %f\n", current->cut_right_angle);
+            current = current->next;
+        }
+
+        rtapi_print_msg(RTAPI_MSG_INFO, "Number of cuts: %d\n", cut_state_machine->list_num_cuts);
+        *(cut_state_machine->print_cut_list) = 0;
+    }
+}
+

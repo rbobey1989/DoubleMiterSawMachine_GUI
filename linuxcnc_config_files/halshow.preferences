@@ -1,17 +1,30 @@
 # Halshow settings
 # This file is generated automatically.
-wm geometry . 700x475+907+261
-placeFrames 0.39244186046511625
-set ::ratio 0.39244186046511625
+wm geometry . 659x719+98+105
+placeFrames 0.40030911901081917
+set ::ratio 0.40030911901081917
 set ::old_w_leftf 160
 set ::watchlist {
-    sig+fake-home-x
-    pin+sim-hardware.Xhoming
-    pin+sim-hardware.Xminsw-upper
-    pin+sim-hardware.Xcurrent-pos
-    pin+joint.0.neg-lim-sw-in
-    pin+joint.0.pos-lim-sw-in
-    pin+joint.0.home-sw-in
+    pin+cut_sm.left-saw-blade-output-move
+    pin+cut_sm.right-saw-blade-output-move
+    pin+joint.0.pos-fb
+    param+cut_sm.min-cut-top-position
+    pin+cut_sm.left-clamp
+    pin+cut_sm.right-clamp
+    pin+motion.feed-inhibit
+    pin+cut_sm.left-head
+    pin+cut_sm.right-head
+    pin+joint.0.is-unlocked
+    pin+joint.0.unlock
+    pin+joint.0.homing
+    pin+cut_sm.homing
+    pin+motion.feed-hold
+    pin+motion.homing-inhibit
+    pin+cut_sm.feed-inhibit
+    pin+cut_sm.homing-start
+    pin+cut_sm.left-saw-blade
+    pin+cut_sm.right-saw-blade
+    pin+cut_sm.breaks
 }
 set ::workmode watchhal
 set ::watchInterval 100

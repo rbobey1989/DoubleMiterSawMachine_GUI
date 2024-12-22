@@ -1,3 +1,38 @@
 # Incluya sus comandos HAL custom_postgui aquí
 # Este archivo no se sobrescribirá cuando vuelva a ejecutar stepconf
 
+net move_to_length => DoubleMitreSawMachine.move-to-length 
+net start_move => DoubleMitreSawMachine.start-move
+net stop_move <= DoubleMitreSawMachine.stop-move
+
+net bottom-length_cut DoubleMitreSawMachine.bottom-cut-length => cut_sm.bottom-cut-length
+net top-length_cut DoubleMitreSawMachine.top-cut-length => cut_sm.top-cut-length
+net height-cut-length  DoubleMitreSawMachine.height-cut-length => cut_sm.height-cut-length
+net start_cut  DoubleMitreSawMachine.cut-start => cut_sm.start-cut
+net status     DoubleMitreSawMachine.cut-status <= cut_sm.status
+net left_angle_cut DoubleMitreSawMachine.cut-left-angle => cut_sm.cut-left-angle
+net right_angle_cut DoubleMitreSawMachine.cut-right-angle => cut_sm.cut-right-angle
+net left_saw_blade DoubleMitreSawMachine.left-saw-blade-btn => cut_sm.left-saw-blade-btn
+net right_saw_blade DoubleMitreSawMachine.right-saw-blade-btn => cut_sm.right-saw-blade-btn
+net saw_blade_output_time DoubleMitreSawMachine.saw-blade-output-time => cut_sm.saw-blade-output-time
+net number_of_cuts DoubleMitreSawMachine.number-of-cuts => cut_sm.number-of-cuts
+net cut_complete DoubleMitreSawMachine.cut-complete => cut_sm.cut-complete
+net homing_start DoubleMitreSawMachine.homing-start => cut_sm.homing-start
+net homing_start DoubleMitreSawMachine.homing-start => cut_sm.homing-start
+net homing_break_deactivate DoubleMitreSawMachine.homing-break-deactivate <= cut_sm.homing-break-deactivate
+
+net cut_add DoubleMitreSawMachine.cut-add => cut_sm.cut-add
+net cut_id_lower  DoubleMitreSawMachine.cut-id-lower  => cut_sm.cut-id-lower
+net cut_id_upper  DoubleMitreSawMachine.cut-id-upper  => cut_sm.cut-id-upper
+net free_cut_list DoubleMitreSawMachine.free-cut-list => cut_sm.free-cut-list
+net print_cut_list DoubleMitreSawMachine.print-cut-list => cut_sm.print-cut-list
+
+net busy_hand_btns DoubleMitreSawMachine.busy-hand-btns => cut_sm.busy-hand-btns
+net clamps_btn <= DoubleMitreSawMachine.clamps-btn
+
+
+
+
+
+
+

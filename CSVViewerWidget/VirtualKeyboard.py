@@ -86,7 +86,7 @@ class VirtualKeyboard(Gtk.Grid):
 #     def __init__(self):
 #         super().__init__(title="Virtual Keyboard")
 #         self.set_border_width(10)
-#         self.set_default_size(600, 300)
+#         #self.set_default_size(600, 300)
 
 #         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 #         self.add(vbox)
