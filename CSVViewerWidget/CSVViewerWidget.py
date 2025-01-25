@@ -1037,6 +1037,16 @@ class CSVViewerWidget(Gtk.Notebook):
     def on_clear_csv(self, widget):
         self.clear_csv()
 
+    def set_sensitive_btns(self, state):
+        self.newCsvListBtn.set_sensitive(state)          
+        self.addProfileCsvListBtn.set_sensitive(state)   
+        self.addCutCsvListBtn.set_sensitive(state)       
+        self.delLineCsvListBtn.set_sensitive(state)      
+        self.clearCsvListBtn.set_sensitive(state)        
+
+
+
+
 
 
 class CSVViewerEntry(Gtk.Entry,Gtk.Editable): 
@@ -1119,8 +1129,6 @@ class CSVViewerEntry(Gtk.Entry,Gtk.Editable):
 
         self.get_buffer().insert_text(position, new_text[:-1], length-1)
         return position
-
-
 
 
 # class MainWindow(Gtk.Window):

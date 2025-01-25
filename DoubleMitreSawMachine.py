@@ -7,6 +7,7 @@ from gi.repository import Gtk, Gdk, GLib
 import os,sys,csv
 
 import linuxcnc
+import time, subprocess
 
 from gladevcp.core import Info, Status, Action
 
@@ -18,7 +19,7 @@ from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget
 from ProfileWidgets.BarWidget import BarWidget
 from ActionBtnsWidgets.ActionsBtnsWidgets import myBtnEstoptoggleAction,myBtnOnOfftoggleAction,myBtnHomeAxisAction
 
-from CSVViewerWidget.CSVViewerWidget import CSVViewerWidget
+from CSVViewerWidget.CSVViewerWidget import CSVViewerWidget, CSVViewerEntry
 from DxfViewer.DxfViewer import DxfViewer
 from DxfExplorer.DxfExplorer import DxfExplorer
 from DxfDataBase.DxfDataBase import DxfDataBase
@@ -59,10 +60,14 @@ class DoubleMitreMachine(Gtk.Window):
         self.hal_pin_move_to_length = self.hal_component.newpin("move-to-length", hal.HAL_FLOAT, hal.HAL_IN)
 
 
-        self.hal_pin_cut_start = self.hal_component.newpin("cut-start", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_cut_start_manual = self.hal_component.newpin("cut-start-manual", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_cut_start_auto = self.hal_component.newpin("cut-start-auto", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_cut_start_step_slide = self.hal_component.newpin("cut-start-step-slide", hal.HAL_BIT, hal.HAL_OUT)
+
         self.hal_pin_cut_add = self.hal_component.newpin("cut-add", hal.HAL_BIT, hal.HAL_IO)
         self.hal_pin_free_cut_list = self.hal_component.newpin("free-cut-list", hal.HAL_BIT, hal.HAL_IO)
-        self.hal_pin_print_cut_list = self.hal_component.newpin("print-cut-list", hal.HAL_BIT, hal.HAL_IO)
+        #self.hal_pin_print_cut_list = self.hal_component.newpin("print-cut-list", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_cut_list_wr = self.hal_component.newpin("cut-list-wr", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_cut_status = self.hal_component.newpin("cut-status", hal.HAL_U32, hal.HAL_IN)
 
         self.hal_pin_bottom_cut_length =self.hal_component.newpin("bottom-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
@@ -82,8 +87,8 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.hal_pin_cut_complete = self.hal_component.newpin("cut-complete", hal.HAL_BIT, hal.HAL_IO)
 
-        self.count_start_pulse = [0]
-        self.start_pulse = [False]
+        self.count_start_manual_pulse = [0]
+        self.start_manual_pulse = [False]
 
         self.count_stop_pulse = [0]
         self.stop_pulse = [False]
@@ -140,13 +145,17 @@ class DoubleMitreMachine(Gtk.Window):
 ##########################################################################################
         self.BusyHandBtns =  Gtk.Button(name="testBtn",label="BusyHandBtns")
         self.clampsBtn =    Gtk.Button(name="testBtn",label="ClampsBtn")
+        self.printListBtn = Gtk.Button(name="testBtn",label="PrintList")
 
         self.hal_pin_busy_hand_busy_btns = hal_glib.GPin( self.hal_component.newpin("busy-hand-btns", hal.HAL_BIT, hal.HAL_OUT))
 
         self.hal_pin_clamps_btn = hal_glib.GPin( self.hal_component.newpin("clamps-btn", hal.HAL_BIT, hal.HAL_OUT))
 
+        self.hal_pin_print_cut_list_btn = hal_glib.GPin( self.hal_component.newpin("print-cut-list", hal.HAL_BIT, hal.HAL_IO))
+
         BusyHandBtnsLastClickTime = [0]
         ClampsBtnLastClickTime = [0]
+        PrintListBtnLastClickTime = [0]
 
         self.BusyHandBtns.connect('button-press-event', self.on_button_press_event, self.hal_pin_busy_hand_busy_btns, BusyHandBtnsLastClickTime)
         self.BusyHandBtns.connect('button-release-event', self.on_button_release_event, self.hal_pin_busy_hand_busy_btns, BusyHandBtnsLastClickTime)
@@ -154,9 +163,13 @@ class DoubleMitreMachine(Gtk.Window):
         self.clampsBtn.connect('button-press-event', self.on_button_press_event,self.hal_pin_clamps_btn, ClampsBtnLastClickTime)
         self.clampsBtn.connect('button-release-event', self.on_button_release_event,self.hal_pin_clamps_btn, ClampsBtnLastClickTime)
 
+        self.printListBtn.connect('button-press-event', self.on_button_press_event,self.hal_pin_print_cut_list_btn, PrintListBtnLastClickTime)
+        self.printListBtn.connect('button-release-event', self.on_button_release_event,self.hal_pin_print_cut_list_btn, PrintListBtnLastClickTime)
+
         hboxTestBtns = Gtk.HBox()
         hboxTestBtns.pack_start(self.BusyHandBtns,False,False,0)
         hboxTestBtns.pack_start(self.clampsBtn,False,False,0)
+        hboxTestBtns.pack_start(self.printListBtn,False,False,0)
 
 ##########################################################################################
 #####                                                                                #####
@@ -317,7 +330,7 @@ class DoubleMitreMachine(Gtk.Window):
         try:
             profile_max_height = float(self.profile_max_height)
         except ValueError:
-            profile_max_height = 300.0
+            profile_max_height = 300.0      
 
         self.manualCuttingProfileWidget = ManualProfileCutWidget(self,
                                                                  max_angle=max_angle,
@@ -330,7 +343,8 @@ class DoubleMitreMachine(Gtk.Window):
         self.manualCuttingProfileWidget.set_dxfViewer(self.dxfViewerManual)
 
         self.leftDiskManualBtn = Gtk.EventBox(can_focus=True)
-        self.leftDiskManualBtn.add(Gtk.Image.new_from_file(filename="icons/disk_off_icon.png"))
+        self.leftDiskManualBtnImage = Gtk.Image.new_from_file(filename="icons/disk_off_icon.png")
+        self.leftDiskManualBtn.add(self.leftDiskManualBtnImage)
 
         self.playManualBtn = Gtk.EventBox(can_focus=True)
         self.playManualBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))  
@@ -347,15 +361,16 @@ class DoubleMitreMachine(Gtk.Window):
         self.angleRightHeadManualBtn.add(Gtk.Image.new_from_file(filename="icons/right_head_angle_90_icon.png"))       
 
         self.rightDiskManualBtn = Gtk.EventBox(can_focus=True)
-        self.rightDiskManualBtn.add(Gtk.Image.new_from_file(filename="icons/disk_off_icon.png"))
+        self.rightDiskManualBtnImage = Gtk.Image.new_from_file(filename="icons/disk_off_icon.png")
+        self.rightDiskManualBtn.add(self.rightDiskManualBtnImage)
 
         self.angleRightHeadManualState = 0
         self.angleLeftHeadManualState = 0 
 
-        self.leftDiskManualState = [0]
+        self.leftDiskState = [0]
         self.leftDiskLastClickTime = [0]
 
-        self.rightDiskManualState = [0]
+        self.rightDiskState = [0]
         self.rightDiskLastClickTime = [0]
 
         vboxManualCuttingProfileWidget_ManualCmdBtns = Gtk.VBox(homogeneous=False) 
@@ -391,11 +406,11 @@ class DoubleMitreMachine(Gtk.Window):
         self.angleRightHeadManualBtn.connect('button-press-event',self.on_angleRightHeadManual_btn_pressed)
         self.angleRightHeadManualBtn.connect('button-release-event',self.on_angleRightHeadManual_btn_released)         
 
-        self.leftDiskManualBtn.connect('button-press-event',self.on_disk_manual_btn_pressed,self.leftDiskManualState,self.leftDiskLastClickTime,self.hal_pin_left_saw_blade)
-        self.rightDiskManualBtn.connect('button-press-event',self.on_disk_manual_btn_pressed,self.rightDiskManualState,self.rightDiskLastClickTime,self.hal_pin_right_saw_blade)
+        self.leftDiskManualBtn.connect('button-press-event',self.on_disk_btn_pressed,self.leftDiskState,self.leftDiskLastClickTime,self.hal_pin_left_saw_blade,'left')
+        self.rightDiskManualBtn.connect('button-press-event',self.on_disk_btn_pressed,self.rightDiskState,self.rightDiskLastClickTime,self.hal_pin_right_saw_blade,'right')
 
-        self.leftDiskManualBtn.connect('button-release-event',self.on_disk_manual_btn_released,self.leftDiskManualState)
-        self.rightDiskManualBtn.connect('button-release-event',self.on_disk_manual_btn_released,self.rightDiskManualState)
+        self.leftDiskManualBtn.connect('button-release-event',self.on_disk_btn_released,self.leftDiskState,'left')
+        self.rightDiskManualBtn.connect('button-release-event',self.on_disk_btn_released,self.rightDiskState,'right')
 
         self.manualCuttingProfileWidget.connect('bad-value', self.on_bad_value)
 
@@ -405,9 +420,28 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################      
 
+        self.fifo_path = '/tmp/cut_list_fifo'
+
+        if not os.path.exists(self.fifo_path):
+            os.mkfifo(self.fifo_path)
+
+        self.max_length = self.inifile.find("JOINT_0", "MAX_LIMIT") or "unknown"
+        self.min_length = self.inifile.find("JOINT_0", "MIN_LIMIT") or "unknown"
+
+        try:
+            max_length = float(self.max_length)
+        except ValueError:
+            max_length = 4000.0
+
+        try:
+            min_length = float(self.min_length)
+        except ValueError:
+            min_length = 290.0
+
         vBoxAutoPage = Gtk.VBox(spacing=10,homogeneous=False)        
 
         self.openListBtn = Gtk.EventBox(can_focus=True)
+        self.openListBtn.set_margin_start(10)
         self.openListBtn.add(Gtk.Image.new_from_file(filename="icons/open_cut_list_csv.png"))  
 
         self.saveListBtn = Gtk.EventBox(can_focus=True)
@@ -420,16 +454,23 @@ class DoubleMitreMachine(Gtk.Window):
         self.playListBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))
 
         self.stopListBtn = Gtk.EventBox(can_focus=True)
-        self.stopListBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png")) 
+        self.stopListBtn.set_sensitive(False)
+        self.stopListBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png"))
+
+        self.leftDiskListBtn = Gtk.EventBox(can_focus=True)
+        self.leftDiskListBtnImage = Gtk.Image.new_from_file(filename="icons/disk_off_icon.png")
+        self.leftDiskListBtn.add(self.leftDiskListBtnImage)
+
+        self.rightDiskListBtn = Gtk.EventBox(can_focus=True)
+        self.rightDiskListBtnImage = Gtk.Image.new_from_file(filename="icons/disk_off_icon.png")
+        self.rightDiskListBtn.add(self.rightDiskListBtnImage) 
 
         self.openListBtn.connect('button-press-event',self.on_open_btn_pressed)
         self.openListBtn.connect('button-release-event',self.on_open_btn_released)
 
-        #self.saveListBtn.connect('button-press-event',self.on_save_clicked)
         self.saveListBtn.connect('button-press-event',self.on_save_btn_pressed)
         self.saveListBtn.connect('button-release-event',self.on_save_btn_released)
 
-        #self.clearListBtn.connect('button-press-event',self.on_delete_clicked) 
         self.clearListBtn.connect('button-press-event',self.on_clear_btn_pressed)
         self.clearListBtn.connect('button-release-event',self.on_clear_btn_released)
 
@@ -439,19 +480,41 @@ class DoubleMitreMachine(Gtk.Window):
         self.stopListBtn.connect('button-press-event',self.on_stop_btn_pressed)
         self.stopListBtn.connect('button-release-event',self.on_stop_btn_released)
 
-        hBoxAutoListLeftBtns = Gtk.HBox(homogeneous=True)
-        hBoxAutoListLeftBtns.pack_start(self.openListBtn,False,False,0)
-        hBoxAutoListLeftBtns.pack_start(self.saveListBtn,False,False,0)
-        hBoxAutoListLeftBtns.pack_end(self.clearListBtn,False,False,0)
+        self.leftDiskListBtn.connect('button-press-event',self.on_disk_btn_pressed,self.leftDiskState,self.leftDiskLastClickTime,self.hal_pin_left_saw_blade,'left')
+        self.rightDiskListBtn.connect('button-press-event',self.on_disk_btn_pressed,self.rightDiskState,self.rightDiskLastClickTime,self.hal_pin_right_saw_blade,'right')
+        
+        self.leftDiskListBtn.connect('button-release-event',self.on_disk_btn_released,self.leftDiskState,'left')       
+        self.rightDiskListBtn.connect('button-release-event',self.on_disk_btn_released,self.rightDiskState,'right')
 
-        hBoxAutoListRightBtns = Gtk.HBox(homogeneous=True)
-        hBoxAutoListRightBtns.pack_end(self.stopListBtn,False,False,0)
-        hBoxAutoListRightBtns.pack_end(self.playListBtn,False,False,0)
+        hBoxAutoListBtns = Gtk.HBox(homogeneous=False)
+        hBoxAutoListBtns.pack_start(self.openListBtn,False,False,0)
+        hBoxAutoListBtns.pack_start(self.saveListBtn,False,False,0)
+        hBoxAutoListBtns.pack_end(self.clearListBtn,False,False,0)
+
+        self.autoFbPosEntry = CSVViewerEntry( parent=self, 
+                                             num_int_digits=4, 
+                                             num_decimal_digits=2,
+                                             init_value=min_length,
+                                             max_value=max_length,
+                                             min_value=min_length)
+        self.autoFbPosEntry.set_name('entryCsvFbPos')
+        self.autoFbPosEntry.set_can_focus(False)
+        self.autoFbPosEntry.set_sensitive(True)
+        self.autoFbPosEntry.set_max_length(7)
+        self.autoFbPosEntry.set_alignment(xalign=0.5)
+        self.autoFbPosEntry.set_editable(False)
+
+        hBoxAutoListCtrlBtns = Gtk.HBox(homogeneous=False)
+        hBoxAutoListCtrlBtns.pack_start(self.leftDiskListBtn,False,False,0)
+        hBoxAutoListCtrlBtns.pack_start(self.playListBtn,False,False,0)
+        hBoxAutoListCtrlBtns.pack_start(self.stopListBtn,False,False,0)
+        hBoxAutoListCtrlBtns.pack_end(self.rightDiskListBtn,False,False,0)
 
         hboxAutoListBtns = Gtk.HBox(homogeneous=False)
-        hboxAutoListBtns.pack_start(hBoxAutoListLeftBtns,False,False,0)
-        hboxAutoListBtns.pack_end(hBoxAutoListRightBtns,False,False,0)
-
+        hboxAutoListBtns.pack_start(hBoxAutoListBtns,False,False,0)
+        hboxAutoListBtns.pack_start(self.autoFbPosEntry,True,True,0)
+        hboxAutoListBtns.pack_end(hBoxAutoListCtrlBtns,False,False,0)
+        
         self.barWidget = BarWidget()
         self.barWidget.set_size_request(-1, 35)
         self.barWidget.set_margin_start(10)
@@ -481,6 +544,8 @@ class DoubleMitreMachine(Gtk.Window):
 
         vBoxAutoPage.pack_start(hboxTreeviewDxfViewer,True,True,0)
 
+        #vBoxAutoPage.pack_start(hBoxAutoListCtrlBtns,False,False,0)
+
         self.notebookPages.append_page(vBoxAutoPage)
 
 ##########################################################################################################################################
@@ -501,13 +566,10 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
-
         self.ioStatusPage = Gtk.Box()
         self.ioStatusPage.set_border_width(10)
         self.ioStatusPage.add(Gtk.Label(label="I/O Status Page!."))
         self.notebookPages.append_page(self.ioStatusPage)
-
-        
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
@@ -515,20 +577,16 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
-
         self.alarmCodesPage = Gtk.Box()
         self.alarmCodesPage.set_border_width(10)
         self.alarmCodesPage.add(Gtk.Label(label="Alarms Codes Page!."))
         self.notebookPages.append_page(self.alarmCodesPage)         
-
-        
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
 #####       #Build Settings Page                                                                                               #####
 #####                                                                                                                                #####
 ##########################################################################################################################################
-
 
         self.settingsPage = Gtk.Box()
         self.settingsPage.set_border_width(10)
@@ -712,6 +770,7 @@ class DoubleMitreMachine(Gtk.Window):
         self.alarmsBtn.set_sensitive(False)
         self.ioStatusBtn.set_sensitive(False)
         self.goHomePageBtn.set_sensitive(False)
+        self.dxfViewerManual.set_sensitive(False)
 
         self.hal_pin_bottom_cut_length.set(self.manualCuttingProfileWidget.get_bottomLengthProfile())
         self.hal_pin_top_cut_length.set(self.manualCuttingProfileWidget.get_topLengthProfile())
@@ -721,7 +780,7 @@ class DoubleMitreMachine(Gtk.Window):
         self.hal_pin_saw_blade_output_time.set(self.manualCuttingProfileWidget.get_timeOutDisk()*1000)  # convert to ms
         self.hal_pin_number_of_cuts.set(self.manualCuttingProfileWidget.get_numberOfCuts())
 
-        self.start_pulse = [True]
+        self.start_manual_pulse = [True]
 
     def on_stopManual_btn_pressed(self,widget,event):
         widget.grab_focus()
@@ -742,6 +801,7 @@ class DoubleMitreMachine(Gtk.Window):
         self.alarmsBtn.set_sensitive(True)
         self.ioStatusBtn.set_sensitive(True)
         self.goHomePageBtn.set_sensitive(True)
+        self.dxfViewerManual.set_sensitive(True)
 
         self.StopMove()
 
@@ -830,30 +890,48 @@ class DoubleMitreMachine(Gtk.Window):
             self.angleRightHeadManualState = angleHeadManualState['90']   
 
 
-    def on_disk_manual_btn_pressed(self,widget,event,state,lastClickTime,hal_pin):
+    def on_disk_btn_pressed(self,widget,event,state,lastClickTime,hal_pin,side):
         currentClickTime = event.time
         if currentClickTime - lastClickTime[0] > 300:
             widget.grab_focus()
-            child = widget.get_child()
-            diskManualState = {'off':0,'on':1}
-            if state[0] == diskManualState['off']:
-                child.set_from_file(filename="icons/disk_off_icon_pressed.png")
-                state[0] = diskManualState['on']
+            diskState = {'off':0,'on':1}
+            if state[0] == diskState['off']:
+                if side == 'left':
+                    self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
+                    self.leftDiskListBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
+                elif side == 'right':
+                    self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
+                    self.rightDiskListBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
+                state[0] = diskState['on']
                 hal_pin.set(True)
-            elif state[0] == diskManualState['on']:
-                child.set_from_file(filename="icons/disk_on_icon_pressed.png")
-                state[0] = diskManualState['off']
+            elif state[0] == diskState['on']:
+                if side == 'left':
+                    self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
+                    self.leftDiskListBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
+                elif side == 'right':
+                    self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
+                    self.rightDiskListBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
+                state[0] = diskState['off']
                 hal_pin.set(False)
             lastClickTime[0] = currentClickTime
 
 
-    def on_disk_manual_btn_released(self,widget,event,state):
-            child = widget.get_child()
-            diskManualState = {'off':0,'on':1}
-            if state[0] == diskManualState['off']:
-                child.set_from_file(filename="icons/disk_off_icon.png")
-            elif state[0] == diskManualState['on']:
-                child.set_from_file(filename="icons/disk_on_icon.png")
+    def on_disk_btn_released(self,widget,event,state,side):
+            diskState = {'off':0,'on':1}
+            if state[0] == diskState['off']:
+                if side == 'left':
+                    self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon.png")
+                    self.leftDiskListBtnImage.set_from_file(filename="icons/disk_off_icon.png")
+                elif side == 'right':
+                    self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon.png")
+                    self.rightDiskListBtnImage.set_from_file(filename="icons/disk_off_icon.png")
+            elif state[0] == diskState['on']:
+                if side == 'left':
+                    self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon.png")
+                    self.leftDiskListBtnImage.set_from_file(filename="icons/disk_on_icon.png")
+                elif side == 'right':
+                    self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon.png")
+                    self.rightDiskListBtnImage.set_from_file(filename="icons/disk_on_icon.png")
 
     def on_bad_value(self, widget, value):
         if value == True:
@@ -912,26 +990,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.csvViewerWidget.on_save_csv_list()
 
-
-    # def on_save_clicked(self, widget, event):
-    #     # dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
-    #     #     Gtk.FileChooserAction.SAVE,
-    #     #     (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
-
-    #     # response = dialog.run()
-    #     # if response == Gtk.ResponseType.OK:
-    #     #     with open(dialog.get_filename(), 'w') as f:
-    #     #         writer = csv.writer(f)
-    #     #         self.csvViewerWidget.write_rows(writer, self.csvViewerWidget.get_treestore())
-
-    #     # dialog.destroy()
-    #     self.csvViewerWidget.on_save_csv_list()
-
-    # def on_delete_clicked(self, widget, event):
-    #     self.csvViewerWidget.clear_csv()
-    #     self.barWidget.update_bar([])
-    #     self.dxfViewerAuto.clear_dxf()
-
     def on_clear_btn_pressed(self, widget, event):
         child = widget.get_child()
         child.set_from_file(filename="icons/clear_cut_list_csv_pressed.png")
@@ -957,28 +1015,35 @@ class DoubleMitreMachine(Gtk.Window):
         if len(selected_rows) == 0:
             LogViewer().emit('public-msg', 'warning', 'Warning: No row selected...')
             return
-        
-        if self.hal_pin_free_cut_list.get() == False:
-            self.hal_pin_free_cut_list.set(True)
-            while (self.hal_pin_free_cut_list.get() == True):{}
-        
+
+        self.openListBtn.set_sensitive(False)
+        self.saveListBtn.set_sensitive(False)
+        self.clearListBtn.set_sensitive(False)
+        self.playListBtn.set_sensitive(False)
+        self.stopListBtn.set_sensitive(True)
+        self.dxfViewerAuto.set_sensitive(False)
+        self.goHomePageBtn.set_sensitive(False)
+        self.csvViewerWidget.set_sensitive_btns(False)
+
+        data = ''
         for row in selected_rows:
-            
-            while (self.hal_pin_cut_add.get() == True):{}
+            top_cut_length = self.csvViewerWidget.get_treestore().get_value(row, 8)
+            bottom_cut_length = self.csvViewerWidget.get_treestore().get_value(row, 9)
+            cut_height = self.csvViewerWidget.get_treestore().get_value(row, 10)
+            cut_left_angle = self.csvViewerWidget.get_treestore().get_value(row, 11)
+            cut_right_angle = self.csvViewerWidget.get_treestore().get_value(row, 12)
+            id_lower = id(row) & 0x00000000FFFFFFFF
+            id_upper = (id(row) >> 32) & 0x00000000FFFFFFFF
+            data += f'{top_cut_length} {bottom_cut_length} {cut_height} {cut_left_angle} {cut_right_angle} {id_lower} {id_upper}\n'
 
-            self.hal_pin_top_cut_length.set(self.csvViewerWidget.get_treestore().get_value(row, 8))
-            self.hal_pin_bottom_cut_length.set(self.csvViewerWidget.get_treestore().get_value(row, 9))
-            self.hal_pin_cut_height.set(self.csvViewerWidget.get_treestore().get_value(row, 10))
-            self.hal_pin_cut_left_angle.set(self.csvViewerWidget.get_treestore().get_value(row, 11))
-            self.hal_pin_cut_right_angle.set(self.csvViewerWidget.get_treestore().get_value(row, 12))
-            self.hal_pin_cut_id_lower.set(id(row) & 0x00000000FFFFFFFF)
-            self.hal_pin_cut_id_upper.set((id(row) >> 32) & 0x00000000FFFFFFFF)
-            print(f'python id: {id(row)}')
+        data += '-1 -1 -1 -1 -1 -1 -1\n'
 
-            self.hal_pin_cut_add.set(True)
+        process = subprocess.Popen(['halstreamer'], stdin=subprocess.PIPE)
+        process.communicate(input=data.encode())
 
-
-
+        self.hal_pin_cut_start_auto.set(True)
+        while self.hal_pin_cut_start_auto.get():
+            time.sleep(0.01)  # Small delay to avoid busy waiting
 
     def on_stop_btn_pressed(self, widget, event):
         child = widget.get_child()
@@ -988,8 +1053,17 @@ class DoubleMitreMachine(Gtk.Window):
         child = widget.get_child()
         child.set_from_file(filename="icons/stop_icon.png")
 
-        if self.hal_pin_print_cut_list.get() == False:
-            self.hal_pin_print_cut_list.set(True)
+        self.openListBtn.set_sensitive(True)
+        self.saveListBtn.set_sensitive(True)
+        self.clearListBtn.set_sensitive(True)
+        self.playListBtn.set_sensitive(True)
+        self.stopListBtn.set_sensitive(False)
+        self.dxfViewerAuto.set_sensitive(True)
+        self.goHomePageBtn.set_sensitive(True)
+        self.csvViewerWidget.set_sensitive_btns(True)
+
+        self.stop_pulse = [True]
+
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
@@ -1027,7 +1101,6 @@ class DoubleMitreMachine(Gtk.Window):
 
             hal_pin.set(False)
     
-
     def on_cut_complete_changed(self, hal_pin, data=None):
         if hal_pin.get() == 1:
 
@@ -1084,6 +1157,7 @@ class DoubleMitreMachine(Gtk.Window):
             19: lambda: LogViewer().emit('public-msg', 'info', 'Info: Turn On Left Saw Blade and Press Busy Hands Buttons For Cut...'),
             20: lambda: LogViewer().emit('public-msg', 'info', 'Info: Cut Only Right Saw Blade For Short Cut...'),
             21: lambda: LogViewer().emit('public-msg', 'info', 'Info: Press Busy Hands Buttons For Move To Recover Length Long Cut...'),
+            23: lambda: LogViewer().emit('public-msg', 'info', 'Info: Cut List Cmpleted...'),
         }
         # Obtener la función correspondiente al estado
         func = switcher.get(status, lambda: LogViewer().emit('public-msg', 'info', 'Info: Estado desconocido...'))
@@ -1092,7 +1166,7 @@ class DoubleMitreMachine(Gtk.Window):
 
     def on_update_cmds_timeout(self): 
 
-        self.pulse_on_hal_pin(None, self.start_pulse, self.count_start_pulse, [2], self.hal_pin_cut_start)
+        self.pulse_on_hal_pin(None, self.start_manual_pulse, self.count_start_manual_pulse, [2], self.hal_pin_cut_start_manual)
         self.pulse_on_hal_pin(None, self.stop_pulse, self.count_stop_pulse, [2], self.hal_pin_stop_move)
 
         return True
@@ -1104,6 +1178,7 @@ class DoubleMitreMachine(Gtk.Window):
         pos_fb_value = s.actual_position[0]
         if self.last_FbPos != pos_fb_value:
             self.manualCuttingProfileWidget.set_FbPos(pos_fb_value)
+            self.autoFbPosEntry.set_text('%.*f'%(self.autoFbPosEntry.get_num_decimal_digits(),pos_fb_value))
             self.last_FbPos = pos_fb_value
 
         # e = linuxcnc.error_channel()

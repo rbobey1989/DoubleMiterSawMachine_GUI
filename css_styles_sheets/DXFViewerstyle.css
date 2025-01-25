@@ -11,5 +11,15 @@
 
 #DXFViewerButton:active {
 	color: #FFF;
-	background: rgb(233, 11, 11);;	
+	background: rgb(233, 11, 11);
+}
+
+#DXFViewerLabel {
+    font-size: 20px;
+    color: white;
+    text-shadow: 2px 2px 4px #000000;
+}
+
+#DXFViewerCombobox {
+	font-size: 16px;
 }

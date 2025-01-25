@@ -5,11 +5,9 @@
 loadrt [KINS]KINEMATICS
 #autoconverted  trivkins
 # motion controller, get name and thread periods from ini file
-loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS unlock_joints_mask=0x01 
+loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS 
 # load 6 differentiators (for velocity and accel signals
 loadrt ddt names=ddt_x,ddt_xv
-loadrt and2 count=1
-loadrt not count=1
 loadrt sim_axis_hardware names=sim-hardware
 loadrt cut_state_machine
 
@@ -20,28 +18,6 @@ setp sim-hardware.Xminsw-lower  -1000
 setp sim-hardware.Xhomesw-pos   [JOINT_0]HOME_OFFSET
 setp sim-hardware.Xhomesw-hyst  0.6
 
-setp cut_sm.min-limit [AXIS_X]MIN_LIMIT
-setp cut_sm.max-limit [AXIS_X]MAX_LIMIT
-setp cut_sm.ferror [JOINT_0]FERROR
-setp cut_sm.angle-head-type-actuator [MACHINE_FEATURES]ANGLE_HEAD_TYPE_ACTUATOR
-setp cut_sm.min-cut-top-position     [MACHINE_FEATURES]MIN_CUT_TOP_POSITION
-
-#setp cut_sm.right-saw-blade-btn-both 0
-#setp cut_sm.right-saw-blade-btn-in-edge 0
-#setp cut_sm.right-saw-blade-btn-out-width-pulses 1000
-
-#setp cut_sm.left-saw-blade-btn-both 0
-#setp cut_sm.left-saw-blade-btn-in-edge 0
-#setp cut_sm.left-saw-blade-btn-out-width-pulses 1000
-
-setp cut_sm.clamps-btn-both 0
-setp cut_sm.clamps-btn-in-edge 0
-setp cut_sm.clamps-btn-out-width-pulses 1
-
-setp cut_sm.busy-hand-btns-both 0
-setp cut_sm.busy-hand-btns-in-edge 0
-setp cut_sm.busy-hand-btns-out-width-pulses 1
-
 
 # add motion controller functions to servo thread
 addf motion-command-handler servo-thread
@@ -50,32 +26,10 @@ addf motion-controller servo-thread
 addf ddt_x servo-thread
 addf ddt_xv servo-thread
 addf sim-hardware.update servo-thread
-addf cut_sm.update-cut-sm servo-thread
-addf cut_sm.edges-detection-update servo-thread
-addf cut_sm.add-cut-list servo-thread
-addf cut_sm.clear-cut-list servo-thread
-addf cut_sm.print-list servo-thread
-addf and2.0 servo-thread
-addf not.0 servo-thread
-
-
-#net busy_hand_btns => not.0.in
-#net not_busy_hand_btns motion.feed-inhibit <= not.0.out
-net feed_inhibit motion.feed-inhibit <= cut_sm.feed-inhibit 
 
 # create HAL signals for position commands from motion module
 # loop position commands back to motion module feedback
-
-
-net Xpos1 joint.0.motor-pos-cmd => joint.0.motor-pos-fb ddt_x.in sim-hardware.Xcurrent-pos cut_sm.pos-fb  
-
-net move_to_length <= cut_sm.move-to-length
-net start_move <= cut_sm.start-move
-net stop_move => cut_sm.stop-move
-net in_pos cut_sm.in_pos <= motion.in-position
-
-net clamps_btn => cut_sm.clamps-button
-
+net Xpos joint.0.motor-pos-cmd => joint.0.motor-pos-fb ddt_x.in sim-hardware.Xcurrent-pos  
 
 net fake-all-home        sim-hardware.homesw-all
 net fake-all-limit       sim-hardware.limitsw-all
@@ -93,7 +47,7 @@ net fake-both-home-x     sim-hardware.Xbothsw-homesw-out
 net fake-max-home-x      sim-hardware.Xmaxsw-homesw-out
 net fake-min-home-x      sim-hardware.Xminsw-homesw-out
 
-net xhoming  joint.0.homing => sim-hardware.Xhoming cut_sm.homing
+net xhoming  joint.0.homing => sim-hardware.Xhoming
 
 
 # send the position commands thru differentiators to
@@ -102,5 +56,5 @@ net Xvel ddt_x.out => ddt_xv.in
 net Xacc <= ddt_xv.out
 
 # estop loopback
-net estop-loop iocontrol.0.user-enable-out iocontrol.0.emc-enable-in cut_sm.estop
+net estop-loop iocontrol.0.user-enable-out iocontrol.0.emc-enable-in
 

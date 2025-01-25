@@ -52,16 +52,16 @@ class DxfViewer(Gtk.Box):
         self.frame_percent_offset = 0.125
 
         # Create a combobox to select Manufacturers
-        manufacturer_combobox_label = Gtk.Label(label="Manufacturers")
-        self.manufacturer_combobox = Gtk.ComboBoxText()
+        manufacturer_combobox_label = Gtk.Label(label="Manufacturers", name="DXFViewerLabel")
+        self.manufacturer_combobox = Gtk.ComboBoxText(name="DXFViewerCombobox")
 
         # Create a combobox to select Sets
-        set_combobox_label = Gtk.Label(label="Sets")
-        self.set_combobox = Gtk.ComboBoxText()
+        set_combobox_label = Gtk.Label(label="Sets", name="DXFViewerLabel")
+        self.set_combobox = Gtk.ComboBoxText(name="DXFViewerCombobox")
 
         # Create a combobox to select code of DXF files
-        code_combobox_label = Gtk.Label(label="DXF Files")
-        self.code_combobox = Gtk.ComboBoxText()
+        code_combobox_label = Gtk.Label(label="DXF Files", name="DXFViewerLabel")
+        self.code_combobox = Gtk.ComboBoxText(name="DXFViewerCombobox")
 
         self.manufacturer_combobox.connect("changed", self.on_manufacturer_changed)
         self.set_combobox.connect("changed", self.on_set_changed)
@@ -110,19 +110,19 @@ class DxfViewer(Gtk.Box):
 
         # Create 'open','rot' and 'mirror' buttons
         # open_button = Gtk.Button(label="Open")
-        rot_rigth_button = Gtk.Button(label="RotR", name="DXFViewerButton")
-        rot_left_button = Gtk.Button(label="RotL", name="DXFViewerButton")
-        x_inv_button = Gtk.Button(label="XInv", name="DXFViewerButton")
-        y_inv_button = Gtk.Button(label="YInv", name="DXFViewerButton")
-        clear_button = Gtk.Button(label="Clear", name="DXFViewerButton")
+        self.rot_rigth_button = Gtk.Button(label="RotR", name="DXFViewerButton")
+        self.rot_left_button = Gtk.Button(label="RotL", name="DXFViewerButton")
+        self.x_inv_button = Gtk.Button(label="XInv", name="DXFViewerButton")
+        self.y_inv_button = Gtk.Button(label="YInv", name="DXFViewerButton")
+        self.clear_button = Gtk.Button(label="Clear", name="DXFViewerButton")
 
         # Connect the buttons to their respective callback functions
         # open_button.connect("clicked", self.on_open_clicked)
-        rot_rigth_button.connect("clicked", self.on_rot_rigth_clicked)
-        rot_left_button.connect("clicked", self.on_rot_left_clicked)
-        x_inv_button.connect("clicked", self.on_x_invert)
-        y_inv_button.connect("clicked", self.on_y_invert)
-        clear_button.connect("clicked", self.on_clear_dxf)
+        self.rot_rigth_button.connect("clicked", self.on_rot_rigth_clicked)
+        self.rot_left_button.connect("clicked", self.on_rot_left_clicked)
+        self.x_inv_button.connect("clicked", self.on_x_invert)
+        self.y_inv_button.connect("clicked", self.on_y_invert)
+        self.clear_button.connect("clicked", self.on_clear_dxf)
 
         # Create a vertical box layout and add the canvas and buttons
         vboxcanvasbtns = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -131,11 +131,11 @@ class DxfViewer(Gtk.Box):
 
         if not self.hide_buttons:
             # hboxbtns.pack_start(open_button, False, False, 0)
-            hboxbtns.pack_start(rot_rigth_button, False, False, 0)
-            hboxbtns.pack_start(rot_left_button, False, False, 0)
-            hboxbtns.pack_start(x_inv_button, False, False, 0)
-            hboxbtns.pack_start(y_inv_button, False, False, 0)
-            hboxbtns.pack_start(clear_button, False, False, 0)
+            hboxbtns.pack_start(self.rot_rigth_button, False, False, 0)
+            hboxbtns.pack_start(self.rot_left_button, False, False, 0)
+            hboxbtns.pack_start(self.x_inv_button, False, False, 0)
+            hboxbtns.pack_start(self.y_inv_button, False, False, 0)
+            hboxbtns.pack_start(self.clear_button, False, False, 0)
         else:
             self.canvas.set_size_request( 400, -1)
         vboxcanvasbtns.pack_start(hboxbtns, False, False, 0)
@@ -672,5 +672,16 @@ class DxfViewer(Gtk.Box):
         code = self.code_combobox.get_active_text()
 
         return manufacturer, set, code
+    
+    def set_sensitive_comboboxes_and_buttons(self, sensitive):
+        self.manufacturer_combobox.set_sensitive(sensitive)
+        self.set_combobox.set_sensitive(sensitive)
+        self.code_combobox.set_sensitive(sensitive)
+        self.rot_rigth_button.set_sensitive(sensitive)
+        self.rot_left_button.set_sensitive(sensitive)
+        self.x_inv_button.set_sensitive(sensitive)
+        self.y_inv_button.set_sensitive(sensitive)
+        self.clear_button.set_sensitive(sensitive)
+
         
         
