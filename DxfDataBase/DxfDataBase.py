@@ -33,6 +33,12 @@ class DxfDataBase:
             ''', (manufacturer, set, code))
         return self.cursor.fetchone()[0]
     
+    def get_all_dxf_files(self):
+        self.cursor.execute('''
+            SELECT * FROM dxf_files_table
+            ''')
+        return self.cursor.fetchall()
+    
     def remove_dxf_file(self, manufacturer, set, code):
         self.cursor.execute('''
             DELETE FROM dxf_files_table WHERE manufacturer = ? AND "set" = ? AND code = ?
@@ -80,5 +86,6 @@ class DxfDataBase:
         return height, width
     
     def close(self):
-        self.conn.close()
-
+        if self.conn:
+            self.conn.close()
+            self.conn = None

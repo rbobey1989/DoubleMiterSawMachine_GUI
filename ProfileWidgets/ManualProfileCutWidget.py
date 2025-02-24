@@ -250,15 +250,15 @@ class ManualProfileCutWidget(Gtk.Overlay):
         self.add_overlay(self.hboxTimeOutDisk)
 
         self.FbPosEntry = EntryNumpad(self,
-                                                  label='fbPos',
-                                                  h_align_entry= myAlign.END,
-                                                  v_align_entry= myAlign.START,                                                  
-                                                  h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
-                                                  v_align_bubbleNumpad=Gtk.ArrowType.UP,
-                                                  num_int_digits=4,
-                                                  num_decimal_digits=1,
-                                                  init_value=0                                                                                            
-                                                  )                                               
+                                    label='fbPos',
+                                    h_align_entry= myAlign.END,
+                                    v_align_entry= myAlign.START,                                                  
+                                    h_align_bubbleNumpad=Gtk.ArrowType.LEFT,
+                                    v_align_bubbleNumpad=Gtk.ArrowType.UP,
+                                    num_int_digits=4,
+                                    num_decimal_digits=1,
+                                    init_value=0                                                                                            
+                                    )                                               
         self.FbPosEntry.set_name('entryWithNumpadManualWidget')
         self.FbPosEntry.set_can_focus(False)
         self.FbPosEntry.set_max_length(7)

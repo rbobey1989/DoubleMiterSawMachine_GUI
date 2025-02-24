@@ -1,6 +1,7 @@
 import gi, os
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GdkPixbuf
+from DxfDataBase.DxfDataBase import DxfDataBase
 
 class DxfExplorer(Gtk.Box):
     def __init__(self):
@@ -8,10 +9,10 @@ class DxfExplorer(Gtk.Box):
 
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
-        self.manufacturer_label = Gtk.Label(label="Manufacturer")
-        self.manufacturer_entry = Gtk.Entry()
-        self.set_label = Gtk.Label(label="Set")
-        self.set_entry = Gtk.Entry()
+        self.manufacturer_label = Gtk.Label(label="Manufacturer", name="dxfExplorerLabel")
+        self.manufacturer_entry = Gtk.Entry(name="dxfExplorerEntry")
+        self.set_label = Gtk.Label(label="Set", name="dxfExplorerLabel")
+        self.set_entry = Gtk.Entry(name="dxfExplorerEntry")
 
         vbox_labels = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         vbox_labels.pack_start(self.manufacturer_label,True, True, 0)
@@ -120,19 +121,20 @@ class DxfExplorer(Gtk.Box):
         vbox.pack_start(hbox, True, True, 0)
 
         # Create a button to find DXF files structured by Manufacturer and Set directories
-        self.find_dxf_by_directories = Gtk.Button(label="DXFs by Directories")
+        self.find_dxf_by_directories = Gtk.Button(label="DXFs by Directories", name= "dxfExplorerButton")
         self.find_dxf_by_directories.connect("clicked", self.on_find_dxf_by_directories_clicked)
 
         # Create a button to find DXF files
-        self.find_dxf_button = Gtk.Button(label="Find DXFs")
+        self.find_dxf_button = Gtk.Button(label="Find DXFs", name= "dxfExplorerButton")
         self.find_dxf_button.connect("clicked", self.on_find_dxf_clicked)
 
         # Create a button to add DXF files
-        self.add_dxf_button = Gtk.Button(label="Add DXFs")
-        # self.add_dxf_button.connect("clicked", self.on_add_dxf_clicked)
+        self.add_dxf_button = Gtk.Button(label="Add DXFs",name= "dxfExplorerButton")
+        self.add_dxf_button.connect("clicked", self.on_add_dxf_clicked)
+        self.DxfsToBBDDList = []
 
         # Create a button to remove DXF files
-        self.remove_dxf_button = Gtk.Button(label="Remove DXFs")
+        self.remove_dxf_button = Gtk.Button(label="Remove DXFs", name= "dxfExplorerButton")
         self.remove_dxf_button.connect("clicked", self.on_remove_dxf_clicked)
 
         self.label="Directory Structure Manufacturer/Set/file.dxf\nProvide the Manufacturer and Set fields to upload manually"
@@ -140,10 +142,11 @@ class DxfExplorer(Gtk.Box):
         self.info_bar.set_margin_top(6)
         self.info_bar.set_size_request(-1, 60)
 
-        self.label_info = Gtk.Label(label=self.label)
+        self.label_info = Gtk.Label(label=self.label, name="infoBarLabel")
         self.info_bar.get_content_area().pack_start(self.label_info, True, True, 0)
 
         self.ok_info_bar_btn = self.info_bar.add_button("OK", Gtk.ResponseType.OK)
+        self.ok_info_bar_btn.set_name("infoBarOkButton")
 
         self.info_bar.connect("response", self.on_info_bar_response)
 
@@ -181,7 +184,7 @@ class DxfExplorer(Gtk.Box):
             # Check if the folder has the correct structure
             if not self.check_folder_structure(folder):
                 # Show a message in the info bar
-                self.show_info_warning_bar("!!!Error!!!!, The selected folder does not have the correct structure.")
+                self.show_info_warning_bar("\n!!!Error!!!!, The selected folder does not have the correct structure.")
                 dialog.destroy()
                 return
             
@@ -236,7 +239,7 @@ class DxfExplorer(Gtk.Box):
             #     btns.set_sensitive(False)
             # self.label_info.set_text("!!!Error!!!!, Please provide Manufacturer and Set fields")
             # self.ok_info_bar_btn.set_visible(True)
-            self.show_info_warning_bar("!!!Error!!!!, Please provide Manufacturer and Set fields")
+            self.show_info_warning_bar("\n!!!Error!!!!, Please provide Manufacturer and Set fields")
             return
 
         dialog = Gtk.FileChooserDialog(
@@ -292,13 +295,53 @@ class DxfExplorer(Gtk.Box):
                                     "",
                                     filename])
             
+    def on_add_dxf_clicked(self, button):
+
+        db = DxfDataBase()
+        selected_rows = []
+        model = self.treestore
+        iter = model.get_iter_first()
+
+        while iter is not None:
+            if model.iter_has_child(iter):
+                child_iter = model.iter_children(iter)
+                while child_iter is not None:
+                    if model.iter_has_child(child_iter):
+                        child_child_iter = model.iter_children(child_iter)
+                        while child_child_iter is not None:
+                            if model.get_value(child_child_iter, 0):
+                                # selected_rows.append([model.get_value(iter, 2), 
+                                #                       model.get_value(child_iter, 3),
+                                #                       os.path.basename(model.get_value(child_child_iter, 4)), 
+                                #                       model.get_value(child_child_iter, 4)])
+                                db.insert(model.get_value(iter, 2), 
+                                                      model.get_value(child_iter, 3),
+                                                      os.path.basename(model.get_value(child_child_iter, 4)), 
+                                                      model.get_value(child_child_iter, 4))
+                            child_child_iter = model.iter_next(child_child_iter)
+                    child_iter = model.iter_next(child_iter)
+            iter = model.iter_next(iter)
+
+        db.close()
+        #self.verify_database()
+
+
+    def verify_database(self):
+        db = DxfDataBase()
+        self.DxfsToBBDDList = db.get_all_dxf_files()
+        db.close()
+
+        # Imprimir la lista de DXF en la base de datos
+        for row in self.DxfsToBBDDList:
+            print(row)
+
 
     def on_remove_dxf_clicked(self, button):
         # Get a list of TreePath for each row in the selection
         model, paths = self.treeview_selection.get_selected_rows()
 
         if len(paths) == 0:
-            self.show_info_warning_bar("!!!Error!!!!, Please select a DXF file to remove")
+            self.show_info_warning_bar("\n!!!Error!!!!, Please select a DXF file to remove")
             return
 
         # Convert the TreePaths to TreeIters and delete each one from the model

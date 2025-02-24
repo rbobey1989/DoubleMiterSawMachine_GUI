@@ -1,39 +1,19 @@
 # Halshow settings
 # This file is generated automatically.
-wm geometry . 1065x719+731+99
+wm geometry . 895x719+2883+60
 placeFrames 0.40030911901081917
 set ::ratio 0.40030911901081917
 set ::old_w_leftf 160
 set ::watchlist {
     pin+cut_sm.left-saw-blade-output-move
     pin+cut_sm.right-saw-blade-output-move
-    param+cut_sm.min-cut-top-position
-    pin+cut_sm.left-clamp
-    pin+cut_sm.right-clamp
-    pin+motion.feed-inhibit
-    pin+cut_sm.left-head
+    pin+streamer.0.empty
+    pin+streamer.0.curr-depth
+    pin+j0.smc.in
+    pin+cut_sm.list-cut-left-angle
+    pin+cut_sm.list-height-cut-length
     pin+cut_sm.right-head
-    pin+joint.0.is-unlocked
-    pin+joint.0.unlock
-    pin+joint.0.homing
-    pin+cut_sm.homing
-    pin+motion.feed-hold
-    pin+motion.homing-inhibit
-    pin+cut_sm.feed-inhibit
-    pin+cut_sm.homing-start
-    pin+cut_sm.left-saw-blade
-    pin+cut_sm.right-saw-blade
-    pin+cut_sm.breaks
-    pin+DoubleMitreSawMachine.cut-list-wr
-    pin+DoubleMitreSawMachine.print-cut-list
-    pin+DoubleMitreSawMachine.busy-hand-btns
-    pin+joint.0.pos-cmd
-    pin+joint.0.vel-cmd
-    pin+joint.0.pos-fb
-    pin+joint.1.pos-cmd
-    pin+joint.1.vel-cmd
-    pin+joint.1.pos-fb
-    pin+j1.limit3.in
+    pin+cut_sm.left-head
 }
 set ::workmode watchhal
 set ::watchInterval 100

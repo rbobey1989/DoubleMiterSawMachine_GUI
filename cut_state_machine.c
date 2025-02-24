@@ -36,9 +36,49 @@ typedef struct{
     float height_cut_length;
     float cut_left_angle;
     float cut_right_angle;
-    uint64_t cut_id;
+    uint32_t line_pathX;
+    uint32_t line_pathY;
     bool used;
 } cut_t;
+
+// Estados de la máquina de estados
+typedef enum {
+    IDLE                                                                   ,
+    REQUEST_USER_TO_PRESS_HANDS_BUSY_BUTTONS                               ,
+    WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_START_MOVE             ,
+    SEND_PRESS_HANDS_BUTTONS_MSG                                           ,
+    POSITIONING_HEAD_ANGLES                                                ,
+    SHORT_CUT                                                              ,
+    NORMAL_CUT                                                             ,
+    LONG_CUT                                                               ,
+    WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL                                ,
+    WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL                                    ,
+    WAITING_FOR_MACHINE_IN_POSITION                                        ,
+    WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED                                ,
+    CHECK_VISUALLY_CONTROLLED_CONTROLLED_CUTTING_BY_THE_OPERATOR_OR_BY_TIME,
+    WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT                    ,
+    IS_CUT_COMPLETE                                                        ,
+    CHECK_MODE_OPERATION                                                   ,
+    SELECT_CUT_TYPE                                                        ,
+    SAW_BLADE_OUTPUT_CONTROLLED_BY_TIME                                    ,
+    SAW_BLADE_OUTPUT_CONTROLLED_BY_USER                                    ,
+    CHANGE_STATE_CLAMPS_LONG_CUT_FOR_STEP_1_2                              ,
+    DELAY_OPEN_CLAMPS                                                      ,
+    SEND_CUT_COMPLETE_MSG                                                  ,
+    DEACTIVATE_BREAK                                                       ,
+    ACTIVATE_BREAK                                                         ,
+    PROCESSING_CUT_LIST                                                    ,
+    WAITING_FOR_CUT_LIST_TO_BE_UPDATED                                     
+} cut_state_t;
+
+
+typedef enum {
+    WAITING_FOR_BREAK_TO_BE_DEACTIVATED           ,
+    WAITING_FOR_BREAK_TO_BE_ACTIVATED_WORK_MODE   ,
+    WAITING_FOR_BREAK_TO_BE_ACTIVATED_HOMING_MODE ,
+    WAITING_FOR_HOMING_START_LOW_LEVEL            ,
+    BREAK_ACTIVATED                               
+} break_state_t;
 
 typedef struct {
 
@@ -72,8 +112,13 @@ typedef struct {
     hal_float_t         *list_height_cut_length;                         // Entrada altura de corte
     hal_float_t         *list_cut_left_angle;                            // Entrada Posición cabezal izquierdo
     hal_float_t         *list_cut_right_angle;                           // Entrada Posición cabezal derecho
-    hal_u32_t           *list_cut_id_lower;
-    hal_u32_t           *list_cut_id_upper;
+    hal_u32_t           *list_line_pathX;
+    hal_u32_t           *list_line_pathX_to_gui;
+    hal_u32_t           *list_line_pathY;
+    hal_u32_t           *list_line_pathY_to_gui;
+    hal_bit_t           *list_line_path_update;
+    hal_bit_t           *cut_list_fifo_empty;
+    hal_s32_t           *cut_list_fifo_curr_depth;
     hal_bit_t           *free_cut_list;
     hal_bit_t           *print_cut_list;
     hal_bit_t           *wr_cut_list;
@@ -89,7 +134,7 @@ typedef struct {
     hal_bit_t           *start_manual_cut;                          // Entrada de inicio de corte manual
     hal_bit_t           *start_auto_cut;                            // Entrada de inicio de corte automático
     hal_bit_t           *start_step_slide_cut;                      // Entrada de inicio de corte paso a paso
-    hal_bit_t           *start_move;                                // Salida de movimiento
+
     hal_bit_t           *stop_move;                                 // Entrada de paro de movimiento
     hal_bit_t           *cut_complete;                              // Salida de corte completo
 
@@ -116,10 +161,11 @@ typedef struct {
     uint16_t            delay_count_right_saw_blade;
     uint16_t            delay_count_break;
     
-    uint8_t             state;                                  // Estado actual de la máquina de estados
+    cut_state_t         state;                                  // Estado actual de la máquina de estados
     float               bottom_cut_length_value;                // Valor de longitud de corte inferior 
     float               top_cut_length_value;                   // Valor de longitud de corte superior
     float               height_cut_value;                       // Valor de altura de corte
+    float               lenght_in_pos_value;                    // Valor de longitud en posición
     uint8_t             operation_mode;                         // Modo Operacion
     uint8_t             current_cut_type;                       // Tipo de corte actual
 
@@ -148,7 +194,7 @@ typedef struct {
     hal_bit_t           *right_saw_blade_output_move;   // Salida para movimiento de disco de corte derecho
 
     hal_bit_t           *breaks;                        // Salida para freno
-    uint8_t             break_state;                    // Estado de freno
+    break_state_t       break_state;                    // Estado de freno
     bool                break_nedded;                   // Freno necesario
 
 } cut_state_machine_t;
@@ -166,39 +212,7 @@ int comp_id; // Identificador del componente
 static const char *modname = MODNAME;
 static const char 	*prefix = PREFIX;
 
-// Estados de la máquina de estados
-#define IDLE                                                                            0
-#define REQUEST_USER_TO_PRESS_HANDS_BUSY_BUTTONS                                        1
-#define WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_START_MOVE                      2
-#define SEND_PRESS_HANDS_BUTTONS_MSG                                                    3
-#define POSITIONING_HEAD_ANGLES                                                         4
-#define SHORT_CUT                                                                       5
-#define NORMAL_CUT                                                                      6
-#define LONG_CUT                                                                        7
-#define WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL                                         8
-#define WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL                                             9
-#define WAITING_FOR_MACHINE_IN_POSITION                                                 10
-#define WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED                                         11
-#define CHECK_VISUALLY_CONTROLLED_CONTROLLED_CUTTING_BY_THE_OPERATOR_OR_BY_TIME         12
-#define WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT                             13
-#define IS_CUT_COMPLETE                                                                 14
-#define CHECK_MODE_OPERATION                                                            15
-#define SELECT_CUT_TYPE                                                                 16
-#define SAW_BLADE_OUTPUT_CONTROLLED_BY_TIME                                             17
-#define SAW_BLADE_OUTPUT_CONTROLLED_BY_USER                                             18
-#define CHANGE_STATE_CLAMPS_LONG_CUT_FOR_STEP_1_2                                       19
-#define DELAY_OPEN_CLAMPS                                                               20
-#define SEND_CUT_COMPLETE_MSG                                                           21
-#define DEACTIVATE_BREAK                                                                22
-#define ACTIVATE_BREAK                                                                  23
-#define PROCESSING_CUT_LIST                                                             24
-#define WAITING_FOR_CUT_LIST_TO_BE_UPDATED                                              25
 
-#define WAITING_FOR_BREAK_TO_BE_DEACTIVATED                                             1
-#define WAITING_FOR_BREAK_TO_BE_ACTIVATED_WORK_MODE                                     2
-#define WAITING_FOR_BREAK_TO_BE_ACTIVATED_HOMING_MODE                                   3
-#define WAITING_FOR_HOMING_START_LOW_LEVEL                                              4
-#define BREAK_ACTIVATED                                                                 5
 
 #define CUT_LIST_MAX_CUTS                                                               1000
 
@@ -321,7 +335,7 @@ int rtapi_app_main(void) {
         return -1;
     }
 
-    cut_state_machine->add_cut_to_list_state = ADD_CUT_TO_LIST;
+    cut_state_machine->add_cut_to_list_state = IDLE;
     cut_state_machine->print_cut_list_state = WAITING_FOR_PRINT_CUT_LIST;
     cut_state_machine->cut_list_num_cuts = 0;
 
@@ -358,9 +372,9 @@ int rtapi_app_main(void) {
     if (retval != 0) goto error;
     *(cut_state_machine->move_to_length) = 0;
 
-    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_move), comp_id, "%s.start-move", prefix);
-    if (retval != 0) goto error;
-    *(cut_state_machine->start_move) = 0;
+    // retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_move), comp_id, "%s.start-move", prefix);
+    // if (retval != 0) goto error;
+    // *(cut_state_machine->start_move) = 0;
 
     retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->stop_move), comp_id, "%s.stop-move", prefix);
     if (retval != 0) goto error;
@@ -396,10 +410,25 @@ int rtapi_app_main(void) {
     retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->list_cut_right_angle), comp_id, "%s.list-cut-right-angle", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->list_cut_id_upper), comp_id, "%s.list-cut-id-upper", prefix);
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->list_line_pathX), comp_id, "%s.list-line-pathX", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->list_cut_id_lower), comp_id, "%s.list-cut-id-lower", prefix);
+    retval = hal_pin_u32_newf(HAL_OUT, &(cut_state_machine->list_line_pathX_to_gui), comp_id, "%s.list-line-pathX-to-gui", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->list_line_pathY), comp_id, "%s.list-line-pathY", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_OUT, &(cut_state_machine->list_line_pathY_to_gui), comp_id, "%s.list-line-pathY-to-gui", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->list_line_path_update), comp_id, "%s.list-line-path-update", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->cut_list_fifo_empty), comp_id, "%s.cut-list-fifo-empty", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_s32_newf(HAL_IN, &(cut_state_machine->cut_list_fifo_curr_depth), comp_id, "%s.cut-list-fifo-curr-depth", prefix);
     if (retval != 0) goto error;
 
     retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->free_cut_list), comp_id, "%s.free-cut-list", prefix);
@@ -499,7 +528,7 @@ int rtapi_app_main(void) {
 
     retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->feed_inhibit), comp_id, "%s.feed-inhibit", prefix);
     if (retval != 0) goto error;
-    *(cut_state_machine->feed_inhibit) = 1;
+    *(cut_state_machine->feed_inhibit) = 0;
 
     retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->homing), comp_id, "%s.homing", prefix);
     if (retval != 0) goto error;
@@ -623,7 +652,7 @@ void update_cut_state_machine(void *arg, long period){
         *(cut_state_machine->right_saw_blade) = 0;
         *(cut_state_machine->left_saw_blade_output_move) = 0;
         *(cut_state_machine->right_saw_blade_output_move) = 0;
-        *(cut_state_machine->feed_inhibit) = 1;
+        *(cut_state_machine->feed_inhibit) = 0;
         *(cut_state_machine->homing_break_deactivate) = 0;
         cut_state_machine->delay_count = 0;
         cut_state_machine->delay_count_left_saw_blade = 0;
@@ -635,17 +664,21 @@ void update_cut_state_machine(void *arg, long period){
         cut_state_machine->clamps_button_state = false;
         cut_state_machine->init_left_cut = false;
         cut_state_machine->init_right_cut = false;
-        *(cut_state_machine->start_move) = 0;
+        //*(cut_state_machine->start_move) = 0;
         *(cut_state_machine->stop_move) = 0;
         cut_state_machine->cut_list_updated = false;
         cut_state_machine->operation_mode = NOT_OPERATION_MODE;
         step_long_cut = 0;
         cut_state_machine->cut_list_num_cuts = 0;
+        cut_state_machine->list_index = 0;
+        *(cut_state_machine->list_line_path_update) = 0;
+        *(cut_state_machine->list_line_pathX_to_gui) = 0;
+        *(cut_state_machine->list_line_pathY_to_gui) = 0;
         for (int i = 0; i < cut_state_machine->cut_list_max_size; i++) {
-            if (!cut_state_machine->cut_list[i].used)
-            {
-                break;
-            }
+            // if (!cut_state_machine->cut_list[i].used)
+            // {
+            //     break;
+            // }
             cut_state_machine->cut_list[i].used = false;
         }
 
@@ -704,7 +737,7 @@ void update_cut_state_machine(void *arg, long period){
                     }
                     else if (*(cut_state_machine->start_auto_cut))
                     {
-                        *(cut_state_machine->start_auto_cut) = 0;
+                        //*(cut_state_machine->start_auto_cut) = 0;
                         cut_state_machine->operation_mode = AUTO_OPERATION_MODE;
                         cut_state_machine->state = WAITING_FOR_CUT_LIST_TO_BE_UPDATED;
                     }
@@ -718,7 +751,6 @@ void update_cut_state_machine(void *arg, long period){
             case WAITING_FOR_CUT_LIST_TO_BE_UPDATED:
                 if (cut_state_machine->cut_list_updated)
                 {
-                    cut_state_machine->add_cut_to_list_state = ADD_CUT_TO_LIST;
                     cut_state_machine->state = PROCESSING_CUT_LIST;
                 }
                 break;
@@ -726,22 +758,27 @@ void update_cut_state_machine(void *arg, long period){
             case POSITIONING_HEAD_ANGLES:
                 if (cut_state_machine->angle_head_type_actuator == PNEUMATIC_ACTUATOR)
                 {
-                    if (cut_state_machine->left_head_pos_value <= 90)
+                    rtapi_print("*********************************\n");
+                    if (cut_state_machine->left_head_pos_value < 90)
                     {
                         *(cut_state_machine->left_head) = 1;
+                        rtapi_print("left_head = 1\n");
                     }
                     else
                     {
                         *(cut_state_machine->left_head) = 0;
+                        rtapi_print("left_head = 0\n");
                     }
 
-                    if (cut_state_machine->right_head_pos_value <= 90)
+                    if (cut_state_machine->right_head_pos_value < 90)
                     {
                         *(cut_state_machine->right_head) = 1;
+                        rtapi_print("right_head = 1\n");
                     }
                     else
                     {
                         *(cut_state_machine->right_head) = 0;
+                        rtapi_print("right_head = 0\n");
                     }
                 }
 
@@ -763,7 +800,6 @@ void update_cut_state_machine(void *arg, long period){
             case WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_START_MOVE:
                 if (cut_state_machine->busy_hand_btns_state)
                 {
-                    //cut_state_machine->busy_hand_btns_state = false;
                     cut_state_machine->state = SELECT_CUT_TYPE;
                 }
                 break;
@@ -790,57 +826,27 @@ void update_cut_state_machine(void *arg, long period){
 
             case NORMAL_CUT:
 
-                if ((fabs(*(cut_state_machine->pos_fb) - cut_state_machine->bottom_cut_length_value) > cut_state_machine->ferror) && !*(cut_state_machine->start_move))
+                if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->bottom_cut_length_value) > cut_state_machine->ferror)
                 {
                     *(cut_state_machine->move_to_length) = cut_state_machine->bottom_cut_length_value;
-                    // *(cut_state_machine->start_move) = 1; 
-                    // cut_state_machine->state = WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL;
+                    cut_state_machine->lenght_in_pos_value = cut_state_machine->bottom_cut_length_value;
                     cut_state_machine->state = DEACTIVATE_BREAK;
                 }
-
-                if (!*(cut_state_machine->start_move))
+                else
                 {
-                    cut_state_machine->delay_count++;
-                    if (cut_state_machine->delay_count == COUNT_MSG)
-                    {
-                       cut_state_machine->delay_count = 0; 
-                       cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
-                    }
-                }   
+                    cut_state_machine->state = ACTIVATE_BREAK;
+                }
 
                 break;
 
             case DEACTIVATE_BREAK:
-                cut_state_machine->break_nedded = true;
-                // cut_state_machine->delay_count++;
-                // if (cut_state_machine->delay_count == COUNT_BREAK)
-                // {
-                //     cut_state_machine->delay_count = 0;
-                    *(cut_state_machine->start_move) = 1; 
-                    cut_state_machine->state = WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL;
-                // }
-                break;
-
-            case WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL:
-                if (!*(cut_state_machine->start_move))
-                {
-                    *(cut_state_machine->start_move) = 0;
-                    cut_state_machine->state = WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL;
-                }
-                break;
-
-            case WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL:
-                if (!(*(cut_state_machine->in_pos)))
-                {
-                    cut_state_machine->state = WAITING_FOR_MACHINE_IN_POSITION;
-                }
+                cut_state_machine->break_nedded = true; 
+                cut_state_machine->state = WAITING_FOR_MACHINE_IN_POSITION;
                 break;
 
             case WAITING_FOR_MACHINE_IN_POSITION:
-                if (*(cut_state_machine->in_pos))
+                if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->lenght_in_pos_value) <= cut_state_machine->ferror)
                 {
-                    // cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
-
                     cut_state_machine->state = ACTIVATE_BREAK;
                 }
                 break;
@@ -848,13 +854,8 @@ void update_cut_state_machine(void *arg, long period){
             case ACTIVATE_BREAK:
                 if (!((cut_state_machine->current_cut_type == LONG_CUT) && step_long_cut == 1))
                 {
-                    // cut_state_machine->delay_count++;
-                    // if (cut_state_machine->delay_count == COUNT_BREAK)
-                    // {
-                    //     cut_state_machine->delay_count = 0;
-                        cut_state_machine->break_nedded = false;
-                        cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
-                    // }
+                    cut_state_machine->break_nedded = false;
+                    cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
                 }
                 else
                 {
@@ -867,7 +868,6 @@ void update_cut_state_machine(void *arg, long period){
                 if (cut_state_machine->clamps_button_state)
                 {                        
                     cut_state_machine->clamps_button_state = false;
-                    //cut_state_machine->busy_hand_btns_state = false;
 
                     if (cut_state_machine->current_cut_type == SHORT_CUT)
                     {
@@ -936,9 +936,9 @@ void update_cut_state_machine(void *arg, long period){
 
                 if (!(cut_state_machine->init_left_cut) && !(cut_state_machine->init_right_cut))
                 {
+                    
                     if (cut_state_machine->busy_hand_btns_state)
                     {
-                        //cut_state_machine->busy_hand_btns_state = false;
 
                         if (cut_state_machine->current_cut_type == NORMAL_CUT)
                         {
@@ -1250,20 +1250,10 @@ void update_cut_state_machine(void *arg, long period){
                 if (fabs(*(cut_state_machine->pos_fb) - short_cut_length - cut_state_machine->min_cut_top_position) > cut_state_machine->ferror)
                 {
                     *(cut_state_machine->move_to_length) = short_cut_length + cut_state_machine->min_cut_top_position;
-                    // *(cut_state_machine->start_move) = 1; 
-                    // cut_state_machine->state = WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL;
+                    cut_state_machine->lenght_in_pos_value = short_cut_length + cut_state_machine->min_cut_top_position;
                     cut_state_machine->state = DEACTIVATE_BREAK;
                 }
 
-                if (!*(cut_state_machine->start_move))
-                {
-                    cut_state_machine->delay_count++;
-                    if (cut_state_machine->delay_count == COUNT_MSG)
-                    {
-                       cut_state_machine->delay_count = 0; 
-                       cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
-                    }
-                }
                 break;
 
 
@@ -1274,8 +1264,7 @@ void update_cut_state_machine(void *arg, long period){
                     if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->max_limit) > cut_state_machine->ferror)
                     {
                         *(cut_state_machine->move_to_length) = cut_state_machine->max_limit;
-                        // *(cut_state_machine->start_move) = 1; 
-                        // cut_state_machine->state = WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL;
+                        cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit;
                         cut_state_machine->state = DEACTIVATE_BREAK;
                     }
                 }
@@ -1295,22 +1284,11 @@ void update_cut_state_machine(void *arg, long period){
                     if (fabs(*(cut_state_machine->pos_fb) - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value)) > cut_state_machine->ferror)
                     {
                         *(cut_state_machine->move_to_length) = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value);
-                        // *(cut_state_machine->start_move) = 1; 
-                        // cut_state_machine->state = WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL;
+                        cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value);
                         cut_state_machine->state = DEACTIVATE_BREAK;
                         *(cut_state_machine->status) = PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_LONG_CUT;
                     }
 
-                }
-
-                if (!*(cut_state_machine->start_move))
-                {
-                    cut_state_machine->delay_count++;
-                    if (cut_state_machine->delay_count == COUNT_MSG)
-                    {
-                        cut_state_machine->delay_count = 0; 
-                        cut_state_machine->state = WAITING_FOR_CLAMPS_BUTTON_TO_BE_PRESSED;
-                    }
                 }
 
                 break;
@@ -1339,11 +1317,16 @@ void update_cut_state_machine(void *arg, long period){
                         cut_state_machine->current_cut_type = LONG_CUT;
                     }
 
+
+                    *(cut_state_machine->list_line_pathX_to_gui) = cut_state_machine->cut_list[cut_state_machine->list_index].line_pathX;
+                    *(cut_state_machine->list_line_pathY_to_gui) = cut_state_machine->cut_list[cut_state_machine->list_index].line_pathY;
+                    *(cut_state_machine->list_line_path_update) = 1;
                     cut_state_machine->list_index++;
                     cut_state_machine->state = POSITIONING_HEAD_ANGLES;
                 }
                 else
                 {
+                    cut_state_machine->list_index = 0;
                     *(cut_state_machine->status) = CUT_LIST_COMPLETED;
                     cut_state_machine->state = IDLE;
                 }
@@ -1373,7 +1356,7 @@ void update_cut_state_machine(void *arg, long period){
                         }
                         else
                         {
-                            *(cut_state_machine->feed_inhibit) = 0;
+                            *(cut_state_machine->feed_inhibit) = 1;
                             cut_state_machine->break_state = WAITING_FOR_BREAK_TO_BE_ACTIVATED_WORK_MODE;
                         }
                     }
@@ -1390,7 +1373,7 @@ void update_cut_state_machine(void *arg, long period){
             case WAITING_FOR_BREAK_TO_BE_ACTIVATED_WORK_MODE:
                 if (!(cut_state_machine->break_nedded && *(cut_state_machine->busy_hand_btns)))
                 {
-                    *(cut_state_machine->feed_inhibit) = 1;
+                    *(cut_state_machine->feed_inhibit) = 0;
                     cut_state_machine->break_state = BREAK_ACTIVATED;
                 }
                 break;
@@ -1494,17 +1477,19 @@ void update_cut_list(void *arg, long period) {
 
     switch (cut_state_machine->add_cut_to_list_state) {
 
+        case IDLE:
+            cut_state_machine->cut_list_num_cuts = 0;
+            if (*(cut_state_machine->start_auto_cut))
+            {
+                *(cut_state_machine->start_auto_cut) = 0;
+                cut_state_machine->add_cut_to_list_state = ADD_CUT_TO_LIST;
+            }
+            break;
+
         case ADD_CUT_TO_LIST:
 
-            if (*(cut_state_machine->list_top_cut_length)    > 0 &&
-                *(cut_state_machine->list_bottom_cut_length) > 0 &&
-                *(cut_state_machine->list_height_cut_length) > 0 &&
-                *(cut_state_machine->list_cut_left_angle)    > 0 &&
-                *(cut_state_machine->list_cut_right_angle)   > 0 &&
-                *(cut_state_machine->list_cut_id_upper)      > 0 &&
-                *(cut_state_machine->list_cut_id_lower)      > 0)
+            if (!*(cut_state_machine->cut_list_fifo_empty))
             {
-
                 cut_state_machine->cut_list_updated = false;
 
                 cut_t *new_cut = NULL;
@@ -1516,36 +1501,22 @@ void update_cut_list(void *arg, long period) {
                 new_cut->height_cut_length = *(cut_state_machine->list_height_cut_length);
                 new_cut->cut_left_angle = *(cut_state_machine->list_cut_left_angle);
                 new_cut->cut_right_angle = *(cut_state_machine->list_cut_right_angle);
-                new_cut->cut_id = (uint64_t)*(cut_state_machine->list_cut_id_lower) & 0x00000000FFFFFFFF;
-                new_cut->cut_id |= ((uint64_t)*(cut_state_machine->list_cut_id_upper) << 32) & 0xFFFFFFFF00000000;
+                new_cut->line_pathX = *(cut_state_machine->list_line_pathX);
+                new_cut->line_pathY = *(cut_state_machine->list_line_pathY);
                 new_cut->used = true;
 
                 cut_state_machine->cut_list_num_cuts++;
-
-                *(cut_state_machine->list_top_cut_length) = 0;
-                *(cut_state_machine->list_bottom_cut_length) = 0;
-                *(cut_state_machine->list_height_cut_length) = 0;
-                *(cut_state_machine->list_cut_left_angle) = 0;
-                *(cut_state_machine->list_cut_right_angle) = 0;
-                *(cut_state_machine->list_cut_id_upper) = 0;
-                *(cut_state_machine->list_cut_id_lower) = 0;
-
             }
-
-            if (*(cut_state_machine->list_top_cut_length)    == -1 &&
-                *(cut_state_machine->list_bottom_cut_length) == -1 &&
-                *(cut_state_machine->list_height_cut_length) == -1 &&
-                *(cut_state_machine->list_cut_left_angle)    == -1 &&
-                *(cut_state_machine->list_cut_right_angle)   == -1 &&
-                *(cut_state_machine->list_cut_id_upper)      == -1 &&
-                *(cut_state_machine->list_cut_id_lower)      == -1)
+            else
             {
                 cut_state_machine->add_cut_to_list_state = LIST_UPDATED;
             }
+
             break;
 
         case LIST_UPDATED:
             cut_state_machine->cut_list_updated = true;
+            cut_state_machine->add_cut_to_list_state = IDLE;
             break;
 
     }
@@ -1567,7 +1538,6 @@ void print_list(void *arg, long period) {
         case PRINT_CUT_LIST:
             if (cut_state_machine->cut_list[cut_state_machine->list_index].used) {
                 rtapi_print("%d--\n",cut_state_machine->list_index);
-                rtapi_print("Cut ID: %lu\n", cut_state_machine->cut_list[cut_state_machine->list_index].cut_id);
                 rtapi_print("Bottom cut length: %f\n", cut_state_machine->cut_list[cut_state_machine->list_index].bottom_cut_length);
                 rtapi_print("Top cut length: %f\n", cut_state_machine->cut_list[cut_state_machine->list_index].top_cut_length);
                 rtapi_print("Height cut length: %f\n", cut_state_machine->cut_list[cut_state_machine->list_index].height_cut_length);

@@ -770,11 +770,24 @@ class CSVViewerWidget(Gtk.Notebook):
                 child_iter = model.iter_children(iter)
                 while child_iter is not None:
                     if model.get_value(child_iter, 0):
-                        selected_rows.append(child_iter)
+                        path = model.get_path(child_iter)
+                        selected_rows.append((child_iter, path))
                     child_iter = model.iter_next(child_iter)
             iter = model.iter_next(iter)
 
         return selected_rows
+    
+    def show_current_line_cut(self, pathIterStr):
+        if pathIterStr is not None:
+            pathIter = Gtk.TreePath.new_from_string(pathIterStr)
+            
+            if pathIter.get_depth() > 1:
+                parentIter = pathIter.copy()
+                parentIter.up()
+                self.treeview.expand_row(parentIter, False)
+            
+            self.treeview.set_cursor(pathIter, self.treeview.get_column(0), True)
+
     
     def set_dxfViewerWidget(self, dxfViewerWidget):
         self.dxfViewerWidget = dxfViewerWidget
@@ -1042,7 +1055,9 @@ class CSVViewerWidget(Gtk.Notebook):
         self.addProfileCsvListBtn.set_sensitive(state)   
         self.addCutCsvListBtn.set_sensitive(state)       
         self.delLineCsvListBtn.set_sensitive(state)      
-        self.clearCsvListBtn.set_sensitive(state)        
+        self.clearCsvListBtn.set_sensitive(state) 
+        self.treeview.set_sensitive(state)
+
 
 
 

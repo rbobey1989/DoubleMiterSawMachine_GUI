@@ -22,7 +22,6 @@ from ActionBtnsWidgets.ActionsBtnsWidgets import myBtnEstoptoggleAction,myBtnOnO
 from CSVViewerWidget.CSVViewerWidget import CSVViewerWidget, CSVViewerEntry
 from DxfViewer.DxfViewer import DxfViewer
 from DxfExplorer.DxfExplorer import DxfExplorer
-from DxfDataBase.DxfDataBase import DxfDataBase
 from LogViewer.LogViewer import LogViewer
 
 INFO = Info()
@@ -56,9 +55,8 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.hal_pin_stop_move = self.hal_component.newpin("stop-move", hal.HAL_BIT, hal.HAL_OUT)
 
-        self.hal_pin_start_move = self.hal_component.newpin("start-move", hal.HAL_BIT, hal.HAL_IN)
         self.hal_pin_move_to_length = self.hal_component.newpin("move-to-length", hal.HAL_FLOAT, hal.HAL_IN)
-
+        self.hal_pin_pos_fb = self.hal_component.newpin("pos-fb", hal.HAL_FLOAT, hal.HAL_IN)
 
         self.hal_pin_cut_start_manual = self.hal_component.newpin("cut-start-manual", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_cut_start_auto = self.hal_component.newpin("cut-start-auto", hal.HAL_BIT, hal.HAL_OUT)
@@ -69,15 +67,15 @@ class DoubleMitreMachine(Gtk.Window):
         #self.hal_pin_print_cut_list = self.hal_component.newpin("print-cut-list", hal.HAL_BIT, hal.HAL_IO)
         self.hal_pin_cut_list_wr = self.hal_component.newpin("cut-list-wr", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_cut_status = self.hal_component.newpin("cut-status", hal.HAL_U32, hal.HAL_IN)
+        self.hal_pin_cut_list_pathX_to_gui = self.hal_component.newpin("list-line-pathX-to-gui", hal.HAL_U32, hal.HAL_IN)
+        self.hal_pin_cut_list_pathY_to_gui = self.hal_component.newpin("list-line-pathY-to-gui", hal.HAL_U32, hal.HAL_IN)
+        self.hal_pin_cut_list_path_update = self.hal_component.newpin("list-line-path-update", hal.HAL_BIT, hal.HAL_IN)
 
         self.hal_pin_bottom_cut_length =self.hal_component.newpin("bottom-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_top_cut_length = self.hal_component.newpin("top-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_cut_height = self.hal_component.newpin("height-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_cut_left_angle = self.hal_component.newpin("cut-left-angle", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_cut_right_angle = self.hal_component.newpin("cut-right-angle", hal.HAL_FLOAT, hal.HAL_OUT)
-
-        self.hal_pin_cut_id_lower = self.hal_component.newpin("cut-id-lower", hal.HAL_U32, hal.HAL_IO)
-        self.hal_pin_cut_id_upper = self.hal_component.newpin("cut-id-upper", hal.HAL_U32, hal.HAL_IO)
 
         self.hal_pin_left_saw_blade = self.hal_component.newpin("left-saw-blade-btn", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_right_saw_blade = self.hal_component.newpin("right-saw-blade-btn", hal.HAL_BIT, hal.HAL_OUT)
@@ -96,9 +94,6 @@ class DoubleMitreMachine(Gtk.Window):
         self.count_cut_add_pulse = [0]
         self.cut_add_pulse = [False]
 
-        self.hal_pin_start_move_trigger = hal_glib.GPin( self.hal_pin_start_move)
-        self.hal_pin_start_move_trigger.connect("value-changed", self.on_start_move_changed)
-
         self.hal_pin_cut_status_trigger = hal_glib.GPin( self.hal_pin_cut_status)
         self.hal_pin_cut_status_trigger.connect("value-changed", self.on_cut_status_changed)
 
@@ -107,6 +102,9 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.hal_pin_number_of_cuts_trigger = hal_glib.GPin( self.hal_pin_number_of_cuts)
         self.hal_pin_number_of_cuts_trigger.connect("value-changed", self.on_number_of_cuts_changed)
+
+        self.hal_pin_cut_list_path_update_trigger = hal_glib.GPin( self.hal_pin_cut_list_path_update)
+        self.hal_pin_cut_list_path_update_trigger.connect("value-changed", self.on_cut_list_path_update_changed)
 
         ### End Hal Pins ###
 
@@ -1026,24 +1024,22 @@ class DoubleMitreMachine(Gtk.Window):
         self.csvViewerWidget.set_sensitive_btns(False)
 
         data = ''
-        for row in selected_rows:
+
+        for iter in selected_rows:
+            row, path = iter
+            pathX = str(path[0]) 
+            pathY = str(path[1])
             top_cut_length = self.csvViewerWidget.get_treestore().get_value(row, 8)
             bottom_cut_length = self.csvViewerWidget.get_treestore().get_value(row, 9)
             cut_height = self.csvViewerWidget.get_treestore().get_value(row, 10)
             cut_left_angle = self.csvViewerWidget.get_treestore().get_value(row, 11)
             cut_right_angle = self.csvViewerWidget.get_treestore().get_value(row, 12)
-            id_lower = id(row) & 0x00000000FFFFFFFF
-            id_upper = (id(row) >> 32) & 0x00000000FFFFFFFF
-            data += f'{top_cut_length} {bottom_cut_length} {cut_height} {cut_left_angle} {cut_right_angle} {id_lower} {id_upper}\n'
-
-        data += '-1 -1 -1 -1 -1 -1 -1\n'
+            data += f'{top_cut_length} {bottom_cut_length} {cut_height} {cut_left_angle} {cut_right_angle} {pathX} {pathY}\n'
 
         process = subprocess.Popen(['halstreamer'], stdin=subprocess.PIPE)
         process.communicate(input=data.encode())
 
         self.hal_pin_cut_start_auto.set(True)
-        while self.hal_pin_cut_start_auto.get():
-            time.sleep(0.01)  # Small delay to avoid busy waiting
 
     def on_stop_btn_pressed(self, widget, event):
         child = widget.get_child()
@@ -1064,6 +1060,13 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.stop_pulse = [True]
 
+    def on_cut_list_path_update_changed(self, hal_pin, data=None):
+        if self.hal_pin_cut_list_path_update.get():            
+            pathX = self.hal_pin_cut_list_pathX_to_gui.get()
+            pathY = self.hal_pin_cut_list_pathY_to_gui.get()
+            print(f'Path: {pathX}, {pathY}')
+            self.csvViewerWidget.show_current_line_cut(f'{pathX}:{pathY}')
+            self.hal_pin_cut_list_path_update.set(False)
 
 ##########################################################################################################################################
 #####                                                                                                                                #####
@@ -1077,29 +1080,19 @@ class DoubleMitreMachine(Gtk.Window):
     def on_button_release_event(self, button, event, hal_pin, lastClickTime):
         hal_pin.set(False)
 
-    def pulse_on_hal_pin(self, widget, start_pulse, count_pulse, delay_counts, hal_pin):
+    def pulse_on_hal_pin(self, widget, pulse, count_pulse, delay_counts, hal_pin):
 
-        if start_pulse[0] == True:
+        if pulse[0] == True:
             hal_pin.set(True)
             count_pulse[0] += 1
             if count_pulse[0] == delay_counts[0]:
                 hal_pin.set(False)
                 count_pulse[0] = 0
-                start_pulse[0] = False
+                pulse[0] = False
 
     def on_cut_status_changed(self, hal_pin, data=None):
         status = hal_pin.get()
         self.handle_cut_status(status)
-
-    def on_start_move_changed(self, hal_pin, data=None):
-        if hal_pin.get() == 1:
-            length = self.hal_pin_move_to_length.get()
-            c = linuxcnc.command()  # Create a new instance of linuxcnc.command
-            fail, self.manualPremode = ACTION.ensure_mode(linuxcnc.MODE_MDI)
-            command = "G0 X%.2f" % length
-            c.mdi('%s' % command)
-
-            hal_pin.set(False)
     
     def on_cut_complete_changed(self, hal_pin, data=None):
         if hal_pin.get() == 1:
@@ -1128,9 +1121,9 @@ class DoubleMitreMachine(Gtk.Window):
         self.manualCuttingProfileWidget.set_numberOfCuts(hal_pin.get())
         
     def StopMove(self):
-        c = linuxcnc.command()
-        c.abort()
-        c.wait_complete()
+        # c = linuxcnc.command()
+        # c.abort()
+        # c.wait_complete()
         self.stop_pulse = [True]
 
     def handle_cut_status(self, status):
@@ -1173,9 +1166,7 @@ class DoubleMitreMachine(Gtk.Window):
     
     def on_update_gui_timeout(self):
 
-        s = linuxcnc.stat()
-        s.poll()
-        pos_fb_value = s.actual_position[0]
+        pos_fb_value = self.hal_pin_pos_fb.get()
         if self.last_FbPos != pos_fb_value:
             self.manualCuttingProfileWidget.set_FbPos(pos_fb_value)
             self.autoFbPosEntry.set_text('%.*f'%(self.autoFbPosEntry.get_num_decimal_digits(),pos_fb_value))
