@@ -7,7 +7,7 @@ from gi.repository import Gtk
 import hal
 import hal_glib 
 
-from gladevcp.hal_actions import EMC_ToggleAction_ESTOP,EMC_ToggleAction_Power,EMC_Action_Home, EMC_Action_UnHome,EMC_Action_Stop
+from gladevcp.hal_actions import EMC_ToggleAction_ESTOP,EMC_ToggleAction_Power,EMC_Action_Home,EMC_Action_Stop
 from hal_glib import GStat
 from LogViewer.LogViewer import LogViewer
 
@@ -91,6 +91,8 @@ class myBtnOnOfftoggleAction(Gtk.EventBox):
 class myBtnHomeAxisAction(Gtk.EventBox):  
     def __init__(self, hal_pin_homing_start, hal_pin_homing_break_deactivate):
         super(myBtnHomeAxisAction,self).__init__(sensitive=False)
+        self.PowerToggleAction = EMC_ToggleAction_Power()
+        self.PowerToggleAction._hal_init()
         self.HomeAxisAction = EMC_Action_Home()
         self.HomeAxisAction._hal_init()
         self.gstat = GStat()
@@ -134,6 +136,8 @@ class myBtnHomeAxisAction(Gtk.EventBox):
 
     def on_hal_pin_homing_break_deactivate(self, hal_pin, data=None):
         if hal_pin.get():
+            self.PowerToggleAction.emit("activate")
+            self.PowerToggleAction.emit("activate")
             self.HomeAxisAction.emit("activate")
             self.hal_pin_homing_start.set(0)
 

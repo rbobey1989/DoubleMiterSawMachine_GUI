@@ -9,6 +9,8 @@ pin out float out;
 pin in bit load=0
     """When TRUE, immediately set \\fBout\\fB to \\fBin\\fR, ignoring maxv
 and maxa""";
+pin in bit   homing=0;
+pin in float home=0;
 pin in float min_=-1e20;
 pin in float max_=1e20;
 pin in float maxv=1e20;
@@ -20,6 +22,9 @@ max/min limit.  Higher values avoid oscillation, but will accelerate
 slightly more slowly.""";
 variable double in_pos_old;
 variable double out_old;
+variable bool   homing_old;
+variable bool   braking = false;
+variable double braking_pos;
 function _;
 license "GPL";
 author "John Kasunich";
@@ -46,8 +51,10 @@ author "John Kasunich";
 // A fudge amount for division errors
 #define EPSILON 1e-9
 
+#define BREAKING_S_GIVEN_V_A(vi,a) ((vi*vi)/(2*a))
+
 FUNCTION(_) {
-    static double invalue;
+    double invalue;
     double in_pos_lim, in_vel;
     double min_vel, max_vel, min_pos, max_pos;
     double stop_pos_max, stop_pos_min;
@@ -61,13 +68,21 @@ FUNCTION(_) {
     double pos_diff, vel_diff, goal_pos_prev;
     double t, ti, a, v, s;
 
-    static bool braking = false;
-    double break_comp = (maxv * maxv) / (2 * maxa);
+    //static bool inhomingvalue = inhoming;
+    //static bool braking = false;
 
     if (enable)
     {
-        invalue = in;
         braking = false;
+        invalue = in;
+    }
+    else if (homing)
+    {
+        invalue = home;       
+        braking_pos = home;
+        in_pos_lim = fmin(max_, fmax(min_, invalue));
+        SET_NEXT_STATE(in_pos_lim, in_pos_lim);
+        return;
     }
     else
     {
@@ -75,25 +90,28 @@ FUNCTION(_) {
         {
             if (out_vel)
             {
-                if (break_comp <= fabs(in - out))
+                if (BREAKING_S_GIVEN_V_A(out_vel,maxa) <= fabs(in - out))
                 {
                     if(out_vel > 0)
                     {
-                        invalue = out + break_comp;
+                        braking_pos = out + BREAKING_S_GIVEN_V_A(out_vel,maxa);
                     }
                     else if(out_vel < 0)
                     {
-                        invalue = out - break_comp;
+                        braking_pos = out - BREAKING_S_GIVEN_V_A(out_vel,maxa);
                     }
                 }
                 else
                 {
-                    invalue = in;
+                    braking_pos = in;
                 }
                 braking = true;
             }
         }
+        invalue = braking_pos;
     }
+
+    homing_old = homing;
 
     if (load) {
 	// Apply first order limit

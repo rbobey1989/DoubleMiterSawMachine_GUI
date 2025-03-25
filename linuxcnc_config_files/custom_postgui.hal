@@ -1,7 +1,7 @@
 # Incluya sus comandos HAL custom_postgui aquí
 # Este archivo no se sobrescribirá cuando vuelva a ejecutar stepconf
 
-net j0_pos_fb       joint.0.pos-fb  => DoubleMitreSawMachine.pos-fb cut_sm.pos-fb
+net j0_pos_fb       joint.1.pos-fb  => DoubleMitreSawMachine.pos-fb cut_sm.pos-fb
 net move_to_length                  => DoubleMitreSawMachine.move-to-length 
 net stop_move                       <= DoubleMitreSawMachine.stop-move
 

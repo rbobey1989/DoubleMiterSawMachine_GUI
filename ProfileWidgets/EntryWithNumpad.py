@@ -165,8 +165,26 @@ class EntryNumpad(Gtk.Entry,Gtk.Editable):
     def get_h_align_entry(self):
         return self.h_align_entry 
     
+    def set_h_align_entry(self,h_align_entry):
+        self.h_align_entry = h_align_entry
+
     def get_v_align_entry(self):
         return self.v_align_entry 
+    
+    def set_v_align_entry(self,v_align_entry):
+        self.v_align_entry = v_align_entry
+
+    def get_h_align_bubbleNumpad(self):
+        return self.h_align_bubbleNumpad
+    
+    def set_h_align_bubbleNumpad(self,h_align_bubbleNumpad):
+        self.h_align_bubbleNumpad = h_align_bubbleNumpad
+
+    def get_v_align_bubbleNumpad(self):
+        return self.v_align_bubbleNumpad
+    
+    def set_v_align_bubbleNumpad(self,v_align_bubbleNumpad):
+        self.v_align_bubbleNumpad = v_align_bubbleNumpad
     
     def get_num_decimal_digits(self):
         return self.num_decimal_digits

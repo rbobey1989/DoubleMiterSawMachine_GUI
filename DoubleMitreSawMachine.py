@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -15,8 +15,9 @@ import hal
 import hal_glib 
 
 
-from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget 
+from ProfileWidgets.ManualProfileCutWidget import ManualProfileCutWidget
 from ProfileWidgets.BarWidget import BarWidget
+from ProfileWidgets.StepByStepCutWidget import StepByStepCutWidget
 from ActionBtnsWidgets.ActionsBtnsWidgets import myBtnEstoptoggleAction,myBtnOnOfftoggleAction,myBtnHomeAxisAction
 
 from CSVViewerWidget.CSVViewerWidget import CSVViewerWidget, CSVViewerEntry
@@ -552,11 +553,34 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################      
 
-        gridStepSlidePage = Gtk.Grid(row_homogeneous=True,column_homogeneous=True,vexpand=True,hexpand=True)        
-        gridStepSlidePage.add(Gtk.Label(label="Logo"))
-        gridStepSlidePage.attach(Gtk.Label(label="Step and Slide Cutting Page!."),1,1,1,1)
+        vBoxStepByStepPage = Gtk.VBox(homogeneous=False)     
 
-        self.notebookPages.append_page(gridStepSlidePage)
+        self.wedgeCuttingProfileWidget = StepByStepCutWidget()
+
+        vBoxStepByStepPage.pack_start(self.wedgeCuttingProfileWidget,True,True,0)
+
+        self.playStepByStepBtn = Gtk.EventBox(can_focus=True)
+        self.playStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))
+        
+        self.stopStepByStepBtn = Gtk.EventBox(can_focus=True)
+        self.stopStepByStepBtn.set_sensitive(False)
+        self.stopStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png"))
+        
+        self.leftDiskStepByStepBtn = Gtk.EventBox(can_focus=True)
+        self.leftDiskStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/disk_off_icon.png"))   
+
+        self.angleLeftStepByStepBtn = Gtk.EventBox(can_focus=True)
+        self.angleLeftStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/left_head_angle_90_icon.png"))   
+
+        hBoxStepByStepBtns = Gtk.HBox(homogeneous=True)
+        hBoxStepByStepBtns.pack_start(self.leftDiskStepByStepBtn,False,False,0)
+        hBoxStepByStepBtns.pack_start(self.angleLeftStepByStepBtn,False,False,0)
+        hBoxStepByStepBtns.pack_start(self.playStepByStepBtn,False,False,0)
+        hBoxStepByStepBtns.pack_end(self.stopStepByStepBtn,False,False,0)
+
+        vBoxStepByStepPage.pack_end(hBoxStepByStepBtns,False,False,0)
+
+        self.notebookPages.append_page(vBoxStepByStepPage)
 
 ##########################################################################################################################################
 #####                                                                                                                                #####

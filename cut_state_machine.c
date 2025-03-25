@@ -87,6 +87,7 @@ typedef struct {
     hal_float_t         ferror;                                     // Entrada longitud de corte
     hal_bit_t           angle_head_type_actuator;                   // Tipo de actuador para posicionamiento de cabezales
     hal_float_t         min_cut_top_position;                       // Posición del tope mínimo
+    hal_float_t         home_pos;                                  // Posición de home
 
     hal_bit_t           *estop;                                     // Entrada de estop
     hal_u32_t           *status;                                    // Salida de estado
@@ -94,6 +95,7 @@ typedef struct {
     hal_bit_t           *homing;                                    // Entrada de homing
     hal_bit_t           *homing_start;                              // Entrada de inicio de homing
     hal_bit_t           *homing_break_deactivate;                   // Salida desactivación de freno en homing
+
 
     hal_float_t         *pos_fb;                                    // Entrada longitud de corte
 
@@ -314,8 +316,8 @@ int rtapi_app_main(void) {
     retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->min_cut_top_position), comp_id, "%s.min-cut-top-position", prefix);
     if (retval != 0) goto error;
 
-    // retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->cut_list_max_size), comp_id, "%s.cut-list-max-size", prefix);
-    // if (retval != 0) goto error;
+    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->home_pos), comp_id, "%s.home-pos", prefix);
+    if (retval != 0) goto error;
 
     if (!list_buffer_size) {
         cut_state_machine->cut_list_max_size = default_list_buffer_size;
@@ -758,27 +760,27 @@ void update_cut_state_machine(void *arg, long period){
             case POSITIONING_HEAD_ANGLES:
                 if (cut_state_machine->angle_head_type_actuator == PNEUMATIC_ACTUATOR)
                 {
-                    rtapi_print("*********************************\n");
+                    //rtapi_print("*********************************\n");
                     if (cut_state_machine->left_head_pos_value < 90)
                     {
                         *(cut_state_machine->left_head) = 1;
-                        rtapi_print("left_head = 1\n");
+                        //rtapi_print("left_head = 1\n");
                     }
                     else
                     {
                         *(cut_state_machine->left_head) = 0;
-                        rtapi_print("left_head = 0\n");
+                        //rtapi_print("left_head = 0\n");
                     }
 
                     if (cut_state_machine->right_head_pos_value < 90)
                     {
                         *(cut_state_machine->right_head) = 1;
-                        rtapi_print("right_head = 1\n");
+                        //rtapi_print("right_head = 1\n");
                     }
                     else
                     {
                         *(cut_state_machine->right_head) = 0;
-                        rtapi_print("right_head = 0\n");
+                        //rtapi_print("right_head = 0\n");
                     }
                 }
 
@@ -1352,6 +1354,7 @@ void update_cut_state_machine(void *arg, long period){
                         if ( *(cut_state_machine->homing_start))
                         {
                             *(cut_state_machine->homing_break_deactivate) = 1;
+                            *(cut_state_machine->move_to_length) = 0;
                             cut_state_machine->break_state = WAITING_FOR_HOMING_START_LOW_LEVEL;
                         }
                         else

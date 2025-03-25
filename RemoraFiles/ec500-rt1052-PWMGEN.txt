@@ -1,0 +1,15 @@
+{
+	"Board": "EC500",
+	"Modules":[
+	{
+	"Thread": "Base",
+	"Type": "PwmGen",
+        "Comment":"Test PWMGEN",
+        "Joint Number":0,
+        "PWM No":1,
+        "PWM Frequency":10000,
+	"Min Duty Cycle":0,
+	"Max Duty Cycle":100
+	}
+	]
+}
