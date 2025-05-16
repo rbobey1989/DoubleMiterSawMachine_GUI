@@ -2,12 +2,13 @@
 
 import gi
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+from gi.repository import Gtk, Gdk, GObject, GLib
 
-import os,sys,csv
+import os,sys
 
 import linuxcnc
-import time, subprocess
+import subprocess
+import time
 
 from gladevcp.core import Info, Status, Action
 
@@ -30,7 +31,9 @@ STATUS = Status()
 ACTION = Action()
 
 class DoubleMitreMachine(Gtk.Window):
-
+    __gsignals__ = {
+        'fb-position': (GObject.SignalFlags.RUN_FIRST, None, (float,))
+    }
     def __init__(self,inifile):
         super().__init__()
         self.set_default_size(1920, 1080)
@@ -49,28 +52,36 @@ class DoubleMitreMachine(Gtk.Window):
         self.update_rate_cmds = 100
         self.update_rate_gui = 100
 
+        self.opration_mode = 'unknown'
+
         ### Hal Pins ###
 
         self.hal_pin_homing_start = self.hal_component.newpin("homing-start", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_homing_break_deactivate = self.hal_component.newpin("homing-break-deactivate", hal.HAL_BIT, hal.HAL_IN)
 
-        self.hal_pin_stop_move = self.hal_component.newpin("stop-move", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_stop_move = self.hal_component.newpin("stop-move", hal.HAL_BIT, hal.HAL_IO)
 
         self.hal_pin_move_to_length = self.hal_component.newpin("move-to-length", hal.HAL_FLOAT, hal.HAL_IN)
         self.hal_pin_pos_fb = self.hal_component.newpin("pos-fb", hal.HAL_FLOAT, hal.HAL_IN)
 
-        self.hal_pin_cut_start_manual = self.hal_component.newpin("cut-start-manual", hal.HAL_BIT, hal.HAL_OUT)
-        self.hal_pin_cut_start_auto = self.hal_component.newpin("cut-start-auto", hal.HAL_BIT, hal.HAL_OUT)
-        self.hal_pin_cut_start_step_slide = self.hal_component.newpin("cut-start-step-slide", hal.HAL_BIT, hal.HAL_OUT)
+        self.hal_pin_cut_start_manual = self.hal_component.newpin("cut-start-manual", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_cut_start_auto = self.hal_component.newpin("cut-start-auto", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_cut_start_step_slide = self.hal_component.newpin("cut-start-step-slide", hal.HAL_BIT, hal.HAL_IO)
 
-        self.hal_pin_cut_add = self.hal_component.newpin("cut-add", hal.HAL_BIT, hal.HAL_IO)
         self.hal_pin_free_cut_list = self.hal_component.newpin("free-cut-list", hal.HAL_BIT, hal.HAL_IO)
-        #self.hal_pin_print_cut_list = self.hal_component.newpin("print-cut-list", hal.HAL_BIT, hal.HAL_IO)
-        self.hal_pin_cut_list_wr = self.hal_component.newpin("cut-list-wr", hal.HAL_BIT, hal.HAL_OUT)
         self.hal_pin_cut_status = self.hal_component.newpin("cut-status", hal.HAL_U32, hal.HAL_IN)
         self.hal_pin_cut_list_pathX_to_gui = self.hal_component.newpin("list-line-pathX-to-gui", hal.HAL_U32, hal.HAL_IN)
         self.hal_pin_cut_list_pathY_to_gui = self.hal_component.newpin("list-line-pathY-to-gui", hal.HAL_U32, hal.HAL_IN)
         self.hal_pin_cut_list_path_update = self.hal_component.newpin("list-line-path-update", hal.HAL_BIT, hal.HAL_IN)
+        self.hal_pin_cut_list_complete = self.hal_component.newpin("cut-list-complete", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_cut_list_lines = self.hal_component.newpin("cut-list-lines", hal.HAL_U32, hal.HAL_OUT)
+
+        self.hal_pin_cut_step_slide_row_to_gui = self.hal_component.newpin("step-slide-row-to-gui", hal.HAL_U32, hal.HAL_IN)
+        self.hal_pin_cut_step_slide_qty_to_gui = self.hal_component.newpin("step-slide-qty-to-gui", hal.HAL_U32, hal.HAL_IN)
+        self.hal_pin_cut_step_slide_check_to_gui = self.hal_component.newpin("step-slide-check-to-gui", hal.HAL_BIT, hal.HAL_IN)
+        self.hal_pin_cut_step_slide_list_complete = self.hal_component.newpin("step-slide-list-complete", hal.HAL_BIT, hal.HAL_IO)
+        self.hal_pin_cut_step_slide_list_lines = self.hal_component.newpin("step-slide-list-lines", hal.HAL_U32, hal.HAL_OUT)
+        
 
         self.hal_pin_bottom_cut_length =self.hal_component.newpin("bottom-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
         self.hal_pin_top_cut_length = self.hal_component.newpin("top-cut-length", hal.HAL_FLOAT, hal.HAL_OUT)
@@ -86,15 +97,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.hal_pin_cut_complete = self.hal_component.newpin("cut-complete", hal.HAL_BIT, hal.HAL_IO)
 
-        self.count_start_manual_pulse = [0]
-        self.start_manual_pulse = [False]
-
-        self.count_stop_pulse = [0]
-        self.stop_pulse = [False]
-
-        self.count_cut_add_pulse = [0]
-        self.cut_add_pulse = [False]
-
         self.hal_pin_cut_status_trigger = hal_glib.GPin( self.hal_pin_cut_status)
         self.hal_pin_cut_status_trigger.connect("value-changed", self.on_cut_status_changed)
 
@@ -106,6 +108,15 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.hal_pin_cut_list_path_update_trigger = hal_glib.GPin( self.hal_pin_cut_list_path_update)
         self.hal_pin_cut_list_path_update_trigger.connect("value-changed", self.on_cut_list_path_update_changed)
+
+        self.hal_pin_cut_list_complete_trigger = hal_glib.GPin( self.hal_pin_cut_list_complete)
+        self.hal_pin_cut_list_complete_trigger.connect("value-changed", self.on_cut_list_complete_changed)
+
+        self.hal_pin_cut_step_slide_list_complete_trigger = hal_glib.GPin(self.hal_pin_cut_step_slide_list_complete)
+        self.hal_pin_cut_step_slide_list_complete_trigger.connect("value-changed", self.on_cut_step_slide_list_complete_changed)
+
+        self.hal_pin_pos_fb_trigger = hal_glib.GPin( self.hal_pin_pos_fb)
+        self.hal_pin_pos_fb_trigger.connect("value-changed", self.on_pos_fb_changed)
 
         ### End Hal Pins ###
 
@@ -178,9 +189,14 @@ class DoubleMitreMachine(Gtk.Window):
 
         hBoxLogoHeader.pack_start(hboxTestBtns,False,False,0)
 
+        self.notebookPages = Gtk.Notebook(name='notebookPages',show_tabs=False,show_border=False)
+
+        self.pages = {'main':0,'manual':1,'auto':2,'stepSlide':3,
+                     'ioState':4,'alarms':5,'settings':6,'dxfExplorer':7}
+
         hBoxSecurityBtns = Gtk.HBox(spacing=50,homogeneous=True,name='securityBtns')
 
-        self.eStopToggleBtn = myBtnEstoptoggleAction()
+        self.eStopToggleBtn = myBtnEstoptoggleAction(notebook=self.notebookPages,mainPage=self.pages['main'])
 
         self.onOffToggleBtn = myBtnOnOfftoggleAction()                        
 
@@ -199,11 +215,6 @@ class DoubleMitreMachine(Gtk.Window):
         hBoxHeader.pack_end(hBoxBtnsHeader,False,False,0)
 
         vBoxMainStruct.pack_start(hBoxHeader,False,True,0)  
-
-        self.notebookPages = Gtk.Notebook(name='notebookPages',show_tabs=False,show_border=False)
-
-        self.pages = {'main':0,'manual':1,'auto':2,'stepSlide':3,
-                     'ioState':4,'alarms':5,'settings':6,'dxfExplorer':7}
 
         vBoxMainStruct.pack_start(self.notebookPages,False,True,0)
 
@@ -241,7 +252,7 @@ class DoubleMitreMachine(Gtk.Window):
         self.stepSlideCuttingBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png")) 
 
         self.manageDxfBtn = Gtk.EventBox()
-        self.manageDxfBtn.add(Gtk.Image.new_from_file(filename="icons/step_slide_mode_icon.png")) 
+        self.manageDxfBtn.add(Gtk.Image.new_from_file(filename="icons/dxf_explorer_icon.png")) 
 
         self.gstatModes.connect('all-homed',  self.set_sensitive_btns_modes)
         self.gstatModes.connect('not-all-homed', self.unset_sensitive_btns_modes)   
@@ -329,14 +340,13 @@ class DoubleMitreMachine(Gtk.Window):
         try:
             profile_max_height = float(self.profile_max_height)
         except ValueError:
-            profile_max_height = 300.0      
+            profile_max_height = 300.0   
 
         self.manualCuttingProfileWidget = ManualProfileCutWidget(self,
                                                                  max_angle=max_angle,
                                                                  max_length=profile_max_length,
                                                                  min_length=profile_min_length)  
         
-        self.last_FbPos = 0.0  
 
         self.dxfViewerManual = DxfViewer(manual_profile_cut_widget=self.manualCuttingProfileWidget)   
         self.manualCuttingProfileWidget.set_dxfViewer(self.dxfViewerManual)
@@ -347,8 +357,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.playManualBtn = Gtk.EventBox(can_focus=True)
         self.playManualBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))  
-        self.moveCMD = False
-        self.manualPremode = None
 
         self.stopManualBtn = Gtk.EventBox(can_focus=True,sensitive=False)
         self.stopManualBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png"))   
@@ -363,8 +371,8 @@ class DoubleMitreMachine(Gtk.Window):
         self.rightDiskManualBtnImage = Gtk.Image.new_from_file(filename="icons/disk_off_icon.png")
         self.rightDiskManualBtn.add(self.rightDiskManualBtnImage)
 
-        self.angleRightHeadManualState = 0
-        self.angleLeftHeadManualState = 0 
+        self.angleRightHeadState = 0
+        self.angleLeftHeadState = 0 
 
         self.leftDiskState = [0]
         self.leftDiskLastClickTime = [0]
@@ -399,11 +407,11 @@ class DoubleMitreMachine(Gtk.Window):
         self.stopManualBtn.connect('button-press-event',self.on_stopManual_btn_pressed)
         self.stopManualBtn.connect('button-release-event',self.on_stopManual_btn_released)   
 
-        self.angleLeftHeadManualBtn.connect('button-press-event',self.on_angleLeftHeadManual_btn_pressed)
-        self.angleLeftHeadManualBtn.connect('button-release-event',self.on_angleLeftHeadManual_btn_released)   
+        self.angleLeftHeadManualBtn.connect('button-press-event',self.on_angleHead_btn_pressed,'left')
+        self.angleLeftHeadManualBtn.connect('button-release-event',self.on_angleHead_btn_released,'left')   
 
-        self.angleRightHeadManualBtn.connect('button-press-event',self.on_angleRightHeadManual_btn_pressed)
-        self.angleRightHeadManualBtn.connect('button-release-event',self.on_angleRightHeadManual_btn_released)         
+        self.angleRightHeadManualBtn.connect('button-press-event',self.on_angleHead_btn_pressed,'right')
+        self.angleRightHeadManualBtn.connect('button-release-event',self.on_angleHead_btn_released,'right')         
 
         self.leftDiskManualBtn.connect('button-press-event',self.on_disk_btn_pressed,self.leftDiskState,self.leftDiskLastClickTime,self.hal_pin_left_saw_blade,'left')
         self.rightDiskManualBtn.connect('button-press-event',self.on_disk_btn_pressed,self.rightDiskState,self.rightDiskLastClickTime,self.hal_pin_right_saw_blade,'right')
@@ -543,8 +551,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         vBoxAutoPage.pack_start(hboxTreeviewDxfViewer,True,True,0)
 
-        #vBoxAutoPage.pack_start(hBoxAutoListCtrlBtns,False,False,0)
-
         self.notebookPages.append_page(vBoxAutoPage)
 
 ##########################################################################################################################################
@@ -553,24 +559,51 @@ class DoubleMitreMachine(Gtk.Window):
 #####                                                                                                                                #####
 ##########################################################################################################################################      
 
+        self.step_slide_max_length = self.inifile.find("DISPLAY", "STEP_SLIDE_MAX_LIMIT") or "unknown"
+        self.step_slide_min_length = self.inifile.find("DISPLAY", "STEP_SLIDE_MIN_LIMIT") or "unknown"
+
+        try:
+            step_slide_max_length = float(self.step_slide_max_length)
+        except ValueError:
+            step_slide_max_length = 4000.0
+
+        try:
+            step_slide_min_length = float(self.step_slide_min_length)
+        except ValueError:
+            step_slide_min_length = 290.0
+
         vBoxStepByStepPage = Gtk.VBox(homogeneous=False)     
 
-        self.wedgeCuttingProfileWidget = StepByStepCutWidget()
+        self.StepByStepCuttingProfileWidget = StepByStepCutWidget(max_length=step_slide_max_length,
+                                                                  min_length=step_slide_min_length)
+        self.StepByStepCuttingProfileWidget.load_data_values()
 
-        vBoxStepByStepPage.pack_start(self.wedgeCuttingProfileWidget,True,True,0)
+        self.angleLeftStepByStepState = 0
+
+        vBoxStepByStepPage.pack_start(self.StepByStepCuttingProfileWidget,True,True,0)
 
         self.playStepByStepBtn = Gtk.EventBox(can_focus=True)
         self.playStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/play_icon.png"))
+        self.playStepByStepBtn.connect('button-press-event',self.on_playStepByStepBtn_pressed)
+        self.playStepByStepBtn.connect('button-release-event',self.on_playStepByStepBtn_released)
         
         self.stopStepByStepBtn = Gtk.EventBox(can_focus=True)
         self.stopStepByStepBtn.set_sensitive(False)
         self.stopStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/stop_icon.png"))
+        self.stopStepByStepBtn.connect('button-press-event',self.on_stopStepByStepBtn_pressed)
+        self.stopStepByStepBtn.connect('button-release-event',self.on_stopStepByStepBtn_released)        
         
         self.leftDiskStepByStepBtn = Gtk.EventBox(can_focus=True)
-        self.leftDiskStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/disk_off_icon.png"))   
+        self.leftDiskStepByStepBtnImage = Gtk.Image.new_from_file(filename="icons/disk_off_icon.png")
+        self.leftDiskStepByStepBtn.add(self.leftDiskStepByStepBtnImage) 
+        self.leftDiskStepByStepBtn.connect('button-press-event',self.on_disk_btn_pressed,self.leftDiskState,self.leftDiskLastClickTime,self.hal_pin_left_saw_blade,'left')
+        self.leftDiskStepByStepBtn.connect('button-release-event',self.on_disk_btn_released,self.leftDiskState,'left')
+
 
         self.angleLeftStepByStepBtn = Gtk.EventBox(can_focus=True)
         self.angleLeftStepByStepBtn.add(Gtk.Image.new_from_file(filename="icons/left_head_angle_90_icon.png"))   
+        self.angleLeftStepByStepBtn.connect('button-press-event',self.on_angleHead_btn_pressed,'left')
+        self.angleLeftStepByStepBtn.connect('button-release-event',self.on_angleHead_btn_released,'left')
 
         hBoxStepByStepBtns = Gtk.HBox(homogeneous=True)
         hBoxStepByStepBtns.pack_start(self.leftDiskStepByStepBtn,False,False,0)
@@ -628,9 +661,6 @@ class DoubleMitreMachine(Gtk.Window):
 
         self.manageDxfPage.add(self.dxfExplorer)
         self.notebookPages.append_page(self.manageDxfPage) 
-
-        self.update_cmds_timer = GLib.timeout_add(self.update_rate_cmds, self.on_update_cmds_timeout)
-        self.update_gui_timer = GLib.timeout_add(self.update_rate_gui, self.on_update_gui_timeout)
 
         self.add(vBoxMainStruct)
 
@@ -724,12 +754,12 @@ class DoubleMitreMachine(Gtk.Window):
 
     def on_manageDxf_btn_pressed(self,widget,event):
         child = widget.get_child()
-        child.set_from_file(filename="icons/step_slide_mode_icon_pressed.png")
+        child.set_from_file(filename="icons/dxf_explorer_icon_pressed.png")
 
     def on_manageDxf_btn_released(self,widget,event):
         self.notebookPages.set_current_page(self.pages['dxfExplorer'])
         child = widget.get_child()
-        child.set_from_file(filename="icons/step_slide_mode_icon.png")
+        child.set_from_file(filename="icons/dxf_explorer_icon.png")
 
     def on_switch_page(self,notebook, page, page_num):
         if notebook == self.notebookPages:
@@ -759,8 +789,6 @@ class DoubleMitreMachine(Gtk.Window):
             self.hal_component.exit()
         except RuntimeError:
             pass  # HAL component is already closed
-        GLib.source_remove(self.update_cmds_timer)
-        GLib.source_remove(self.update_gui_timer)
         Gtk.main_quit()
 
 ##########################################################################################################################################
@@ -783,6 +811,8 @@ class DoubleMitreMachine(Gtk.Window):
             LogViewer().emit('public-msg', 'warning', 'Warning: Number of Cuts is Zero...')
             return
         
+        self.opration_mode = 'manual'
+        
         self.stopManualBtn.set_sensitive(True)
         self.playManualBtn.set_sensitive(False)
         self.angleRightHeadManualBtn.set_sensitive(False)
@@ -802,7 +832,7 @@ class DoubleMitreMachine(Gtk.Window):
         self.hal_pin_saw_blade_output_time.set(self.manualCuttingProfileWidget.get_timeOutDisk()*1000)  # convert to ms
         self.hal_pin_number_of_cuts.set(self.manualCuttingProfileWidget.get_numberOfCuts())
 
-        self.start_manual_pulse = [True]
+        self.hal_pin_cut_start_manual.set(True)
 
     def on_stopManual_btn_pressed(self,widget,event):
         widget.grab_focus()
@@ -813,6 +843,8 @@ class DoubleMitreMachine(Gtk.Window):
 
         child = widget.get_child() 
         child.set_from_file(filename="icons/stop_icon.png")  
+
+        self.opration_mode = 'unknown'
 
         self.stopManualBtn.set_sensitive(False)
         self.playManualBtn.set_sensitive(True)
@@ -825,92 +857,75 @@ class DoubleMitreMachine(Gtk.Window):
         self.goHomePageBtn.set_sensitive(True)
         self.dxfViewerManual.set_sensitive(True)
 
-        self.StopMove()
+        self.hal_pin_stop_move.set(True)
 
-    def on_angleLeftHeadManual_btn_pressed(self,widget,event):
+    def on_angleHead_btn_pressed(self,widget,event,hand):
         widget.grab_focus()
-        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
-        child = widget.get_child()
-        if self.angleLeftHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/left_head_angle_90_icon_pressed.png")
-        elif self.angleLeftHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/left_head_angle_45_icon_pressed.svg")
-        elif self.angleLeftHeadManualState == angleHeadManualState['135']:
-            child.set_from_file(filename="icons/left_head_angle_135_icon_pressed.svg") 
-        elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/left_head_angle_variable_icon_pressed.svg")       
+        odds = {'90':0,'45':1,'135':2,'angle':3}
+        leftChilds = [self.angleLeftHeadManualBtn.get_child(),
+                      self.angleLeftStepByStepBtn.get_child()]
+        rightChilds = [self.angleRightHeadManualBtn.get_child()]
 
-    def on_angleLeftHeadManual_btn_released(self,widget,event): 
-        child = widget.get_child() 
-        self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(False)
-        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
-        if self.angleLeftHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/left_head_angle_45_icon.svg")
-            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%45)
-            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 45)            
-            self.angleLeftHeadManualState = angleHeadManualState['45']
-        elif self.angleLeftHeadManualState == angleHeadManualState['45']:
+        childs = leftChilds if hand == 'left' else rightChilds
+        angleHeadState = self.angleLeftHeadState if hand == 'left' else self.angleRightHeadState
+        
+        if angleHeadState == odds['90']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_90_icon_pressed.svg")
+        elif angleHeadState == odds['45']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_45_icon_pressed.svg")
+        elif angleHeadState == odds['135']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_135_icon_pressed.svg")
+        elif angleHeadState == odds['angle']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_variable_icon_pressed.svg")
+
+    def on_angleHead_btn_released(self,widget,event,hand):
+        odds = {'90':0,'45':1,'135':2,'angle':3}
+        leftChilds = [self.angleLeftHeadManualBtn.get_child(),
+                      self.angleLeftStepByStepBtn.get_child()]
+        rightChilds = [self.angleRightHeadManualBtn.get_child()]
+
+        childs = leftChilds if hand == 'left' else rightChilds
+        angleHeadState = self.angleLeftHeadState if hand == 'left' else self.angleRightHeadState
+        angleProfileEntry = self.manualCuttingProfileWidget.get_leftAngleProfileEntry() if hand == 'left' else self.manualCuttingProfileWidget.get_rightAngleProfileEntry()
+
+        if angleHeadState == odds['90']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_45_icon.svg")
+            angleProfileEntry.set_text('%.2f'%45)
+            self.manualCuttingProfileWidget.emit('update-value', angleProfileEntry, 45)            
+            angleHeadState = odds['45']
+        elif angleHeadState == odds['45']:
             if self.inside_angles == "YES":
-                child.set_from_file(filename="icons/left_head_angle_135_icon.svg") 
-                self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%135)
-                self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 135)
-                self.angleLeftHeadManualState = angleHeadManualState['135'] 
+                for child in childs:
+                    child.set_from_file(filename="icons/"+hand+"_head_angle_135_icon.svg") 
+                angleProfileEntry.set_text('%.2f'%135)
+                self.manualCuttingProfileWidget.emit('update-value', angleProfileEntry, 135)
+                angleHeadState = odds['135'] 
             else:
-                child.set_from_file(filename="icons/left_head_angle_variable_icon.svg") 
-                self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(True)
-                self.angleLeftHeadManualState = angleHeadManualState['angle']
-        elif self.angleLeftHeadManualState == angleHeadManualState['135']:
-            child.set_from_file(filename="icons/left_head_angle_variable_icon.svg") 
-            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_can_focus(True)
-            self.angleLeftHeadManualState = angleHeadManualState['angle']
-        elif self.angleLeftHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/left_head_angle_90_icon.svg")
-            self.manualCuttingProfileWidget.get_leftAngleProfileEntry().set_text('%.2f'%90)
-            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_leftAngleProfileEntry(), 90)
-            self.angleLeftHeadManualState = angleHeadManualState['90'] 
+                for child in childs:
+                    child.set_from_file(filename="icons/"+hand+"_head_angle_variable_icon.svg") 
+                angleProfileEntry.set_can_focus(True)
+                angleHeadState = odds['angle']
+        elif angleHeadState == odds['135']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_variable_icon.svg") 
+            angleProfileEntry.set_can_focus(True)
+            angleHeadState = odds['angle']
+        elif angleHeadState == odds['angle']:
+            for child in childs:
+                child.set_from_file(filename="icons/"+hand+"_head_angle_90_icon.svg")
+            angleProfileEntry.set_text('%.2f'%90)
+            self.manualCuttingProfileWidget.emit('update-value', angleProfileEntry, 90)
+            angleHeadState = odds['90']
 
-    def on_angleRightHeadManual_btn_pressed(self,widget,event):
-        widget.grab_focus()
-        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
-        child = widget.get_child()
-        if self.angleRightHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/right_head_angle_90_icon_pressed.svg")
-        elif self.angleRightHeadManualState == angleHeadManualState['45']:
-            child.set_from_file(filename="icons/right_head_angle_45_icon_pressed.svg") 
-        elif self.angleRightHeadManualState == angleHeadManualState['135']:
-            child.set_from_file(filename="icons/right_head_angle_135_icon_pressed.svg")
-        elif self.angleRightHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/right_head_angle_variable_icon_pressed.svg")              
-
-    def on_angleRightHeadManual_btn_released(self,widget,event): 
-        child = widget.get_child()
-        self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(False) 
-        angleHeadManualState = {'90':0,'45':1,'135':2,'angle':3}
-        if self.angleRightHeadManualState == angleHeadManualState['90']:
-            child.set_from_file(filename="icons/right_head_angle_45_icon.svg")
-            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%45)
-            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 45)             
-            self.angleRightHeadManualState = angleHeadManualState['45']
-        elif self.angleRightHeadManualState == angleHeadManualState['45']:
-            if self.inside_angles == "YES":
-                child.set_from_file(filename="icons/right_head_angle_135_icon.svg")
-                self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%135)
-                self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 135)
-                self.angleRightHeadManualState = angleHeadManualState['135']
-            else:
-                child.set_from_file(filename="icons/right_head_angle_variable_icon.svg")
-                self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(True)
-                self.angleRightHeadManualState = angleHeadManualState['angle']
-        elif self.angleRightHeadManualState == angleHeadManualState['135']:
-            child.set_from_file(filename="icons/right_head_angle_variable_icon.svg") 
-            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_can_focus(True)
-            self.angleRightHeadManualState = angleHeadManualState['angle'] 
-        elif self.angleRightHeadManualState == angleHeadManualState['angle']:
-            child.set_from_file(filename="icons/right_head_angle_90_icon.svg")
-            self.manualCuttingProfileWidget.get_rightAngleProfileEntry().set_text('%.2f'%90)
-            self.manualCuttingProfileWidget.emit('update-value', self.manualCuttingProfileWidget.get_rightAngleProfileEntry(), 90)            
-            self.angleRightHeadManualState = angleHeadManualState['90']   
-
+        if hand == 'left':
+            self.angleLeftHeadState = angleHeadState
+        else:
+            self.angleRightHeadState = angleHeadState
 
     def on_disk_btn_pressed(self,widget,event,state,lastClickTime,hal_pin,side):
         currentClickTime = event.time
@@ -921,6 +936,7 @@ class DoubleMitreMachine(Gtk.Window):
                 if side == 'left':
                     self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
                     self.leftDiskListBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
+                    self.leftDiskStepByStepBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
                 elif side == 'right':
                     self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
                     self.rightDiskListBtnImage.set_from_file(filename="icons/disk_off_icon_pressed.png")
@@ -930,6 +946,7 @@ class DoubleMitreMachine(Gtk.Window):
                 if side == 'left':
                     self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
                     self.leftDiskListBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
+                    self.leftDiskStepByStepBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
                 elif side == 'right':
                     self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
                     self.rightDiskListBtnImage.set_from_file(filename="icons/disk_on_icon_pressed.png")
@@ -944,6 +961,7 @@ class DoubleMitreMachine(Gtk.Window):
                 if side == 'left':
                     self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon.png")
                     self.leftDiskListBtnImage.set_from_file(filename="icons/disk_off_icon.png")
+                    self.leftDiskStepByStepBtnImage.set_from_file(filename="icons/disk_off_icon.png")
                 elif side == 'right':
                     self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_off_icon.png")
                     self.rightDiskListBtnImage.set_from_file(filename="icons/disk_off_icon.png")
@@ -951,9 +969,13 @@ class DoubleMitreMachine(Gtk.Window):
                 if side == 'left':
                     self.leftDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon.png")
                     self.leftDiskListBtnImage.set_from_file(filename="icons/disk_on_icon.png")
+                    self.leftDiskStepByStepBtnImage.set_from_file(filename="icons/disk_on_icon.png")
                 elif side == 'right':
                     self.rightDiskManualBtnImage.set_from_file(filename="icons/disk_on_icon.png")
                     self.rightDiskListBtnImage.set_from_file(filename="icons/disk_on_icon.png")
+
+    def on_number_of_cuts_changed(self, hal_pin, data=None):
+        self.manualCuttingProfileWidget.set_numberOfCuts(hal_pin.get())
 
     def on_bad_value(self, widget, value):
         if value == True:
@@ -988,9 +1010,12 @@ class DoubleMitreMachine(Gtk.Window):
         child = widget.get_child()
         child.set_from_file(filename="icons/open_cut_list_csv.png")
 
-        fileChooserDialog = Gtk.FileChooserDialog("Por favor elige un archivo", self,
-            Gtk.FileChooserAction.OPEN,
-            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        fileChooserDialog = Gtk.FileChooserDialog(title="Por favor elige un archivo",parent=self,
+            action=Gtk.FileChooserAction.OPEN)
+        fileChooserDialog.add_buttons(
+            Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, 
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+        fileChooserDialog.set_current_folder('cuttingListData')
         fileChooserDialog.get_style_context().add_class("dialog")
         
         response = fileChooserDialog.run()
@@ -1037,6 +1062,8 @@ class DoubleMitreMachine(Gtk.Window):
         if len(selected_rows) == 0:
             LogViewer().emit('public-msg', 'warning', 'Warning: No row selected...')
             return
+        
+        self.opration_mode = 'auto'
 
         self.openListBtn.set_sensitive(False)
         self.saveListBtn.set_sensitive(False)
@@ -1048,6 +1075,7 @@ class DoubleMitreMachine(Gtk.Window):
         self.csvViewerWidget.set_sensitive_btns(False)
 
         data = ''
+        count = 0
 
         for iter in selected_rows:
             row, path = iter
@@ -1058,9 +1086,12 @@ class DoubleMitreMachine(Gtk.Window):
             cut_height = self.csvViewerWidget.get_treestore().get_value(row, 10)
             cut_left_angle = self.csvViewerWidget.get_treestore().get_value(row, 11)
             cut_right_angle = self.csvViewerWidget.get_treestore().get_value(row, 12)
+            count += 1
             data += f'{top_cut_length} {bottom_cut_length} {cut_height} {cut_left_angle} {cut_right_angle} {pathX} {pathY}\n'
 
-        process = subprocess.Popen(['halstreamer'], stdin=subprocess.PIPE)
+        self.hal_pin_cut_list_lines.set(count)
+
+        process = subprocess.Popen(['halstreamer','-c','0'], stdin=subprocess.PIPE)
         process.communicate(input=data.encode())
 
         self.hal_pin_cut_start_auto.set(True)
@@ -1073,6 +1104,8 @@ class DoubleMitreMachine(Gtk.Window):
         child = widget.get_child()
         child.set_from_file(filename="icons/stop_icon.png")
 
+        self.opration_mode = 'unknown'
+
         self.openListBtn.set_sensitive(True)
         self.saveListBtn.set_sensitive(True)
         self.clearListBtn.set_sensitive(True)
@@ -1082,19 +1115,116 @@ class DoubleMitreMachine(Gtk.Window):
         self.goHomePageBtn.set_sensitive(True)
         self.csvViewerWidget.set_sensitive_btns(True)
 
-        self.stop_pulse = [True]
+        self.hal_pin_stop_move.set(True)
 
     def on_cut_list_path_update_changed(self, hal_pin, data=None):
         if self.hal_pin_cut_list_path_update.get():            
             pathX = self.hal_pin_cut_list_pathX_to_gui.get()
             pathY = self.hal_pin_cut_list_pathY_to_gui.get()
-            print(f'Path: {pathX}, {pathY}')
             self.csvViewerWidget.show_current_line_cut(f'{pathX}:{pathY}')
             self.hal_pin_cut_list_path_update.set(False)
 
+    def on_cut_list_complete_changed(self, hal_pin, data=None):
+        if self.hal_pin_cut_list_complete.get():
+            self.opration_mode = 'unknown'
+
+            self.openListBtn.set_sensitive(True)
+            self.saveListBtn.set_sensitive(True)
+            self.clearListBtn.set_sensitive(True)
+            self.playListBtn.set_sensitive(True)
+            self.stopListBtn.set_sensitive(False)
+            self.dxfViewerAuto.set_sensitive(True)
+            self.goHomePageBtn.set_sensitive(True)
+            self.csvViewerWidget.set_sensitive_btns(True)
+
+            self.hal_pin_stop_move.set(True)
+            self.hal_pin_cut_list_complete.set(False)
+
 ##########################################################################################################################################
 #####                                                                                                                                #####
-#####       Positioning Logic Develop                                                                                             #####
+#####        Step by Step Mode Logic Develop                                                                                         #####
+#####                                                                                                                                #####
+##########################################################################################################################################
+
+    def on_playStepByStepBtn_pressed(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/play_icon_pressed.png")
+
+
+    def on_playStepByStepBtn_released(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/play_icon.png")
+
+        self.opration_mode = 'stepSlide'
+
+        self.stopStepByStepBtn.set_sensitive(True)
+        self.playStepByStepBtn.set_sensitive(False)
+        self.angleLeftStepByStepBtn.set_sensitive(False)
+
+        startRow = int(self.StepByStepCuttingProfileWidget.get_rowStartListEntry().get_text())
+        endRow = int(self.StepByStepCuttingProfileWidget.get_rowEndListEntry().get_text())
+        checkRows = self.StepByStepCuttingProfileWidget.get_checkRows()
+        entries = self.StepByStepCuttingProfileWidget.get_entries()
+
+        data = ''
+        count = 0
+
+        for i in range(startRow-1, endRow):
+            if checkRows[i].get_active() == True:
+                length_profile = float(self.StepByStepCuttingProfileWidget.get_entries()[i][0].get_text())
+                length_piece = float(self.StepByStepCuttingProfileWidget.get_entries()[i][1].get_text())
+                qty = int(self.StepByStepCuttingProfileWidget.get_entries()[i][2].get_text())
+                data += f'{length_profile} {length_piece} {qty} {self.manualCuttingProfileWidget.get_leftAngleProfile()} {i}\n'     #Angle Left is the same 
+                count += 1
+
+        self.hal_pin_cut_step_slide_list_lines.set(count)
+        self.hal_pin_saw_blade_output_time.set(self.StepByStepCuttingProfileWidget.get_time_out_disk()*1000)  # convert to ms
+
+        process = subprocess.Popen(['halstreamer','-c','1'], stdin=subprocess.PIPE)
+        process.communicate(input=data.encode())
+
+        self.hal_pin_cut_start_step_slide.set(True)
+
+
+
+    def on_stopStepByStepBtn_pressed(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/stop_icon_pressed.png")
+
+    def on_stopStepByStepBtn_released(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/stop_icon.png")
+
+        self.opration_mode = 'unknown'
+
+        self.stopStepByStepBtn.set_sensitive(False)
+        self.playStepByStepBtn.set_sensitive(True)
+        self.angleLeftStepByStepBtn.set_sensitive(True)
+
+        self.hal_pin_stop_move.set(True)
+
+    def on_leftDiskStepByStepBtn_pressed(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/disk_off_icon_pressed.png")
+
+    def on_leftDiskStepByStepBtn_released(self,widget,event):
+        child = widget.get_child()
+        child.set_from_file(filename="icons/disk_off_icon.png")
+
+    def on_cut_step_slide_list_complete_changed(self, hal_pin, data=None):
+        if self.hal_pin_cut_step_slide_list_complete.get():
+            self.opration_mode = 'unknown'
+
+            self.stopStepByStepBtn.set_sensitive(False)
+            self.playStepByStepBtn.set_sensitive(True)
+            self.angleLeftStepByStepBtn.set_sensitive(True)
+
+            self.hal_pin_stop_move.set(True)
+            self.hal_pin_cut_step_slide_list_complete.set(False)
+
+##########################################################################################################################################
+#####                                                                                                                                #####
+#####       Positioning Logic Develop                                                                                                #####
 #####                                                                                                                                #####
 ##########################################################################################################################################
 
@@ -1104,15 +1234,15 @@ class DoubleMitreMachine(Gtk.Window):
     def on_button_release_event(self, button, event, hal_pin, lastClickTime):
         hal_pin.set(False)
 
-    def pulse_on_hal_pin(self, widget, pulse, count_pulse, delay_counts, hal_pin):
+    # def pulse_on_hal_pin(self, widget, pulse, count_pulse, delay_counts, hal_pin):
 
-        if pulse[0] == True:
-            hal_pin.set(True)
-            count_pulse[0] += 1
-            if count_pulse[0] == delay_counts[0]:
-                hal_pin.set(False)
-                count_pulse[0] = 0
-                pulse[0] = False
+    #     if pulse[0] == True:
+    #         hal_pin.set(True)
+    #         count_pulse[0] += 1
+    #         if count_pulse[0] == delay_counts[0]:
+    #             hal_pin.set(False)
+    #             count_pulse[0] = 0
+    #             pulse[0] = False
 
     def on_cut_status_changed(self, hal_pin, data=None):
         status = hal_pin.get()
@@ -1120,35 +1250,44 @@ class DoubleMitreMachine(Gtk.Window):
     
     def on_cut_complete_changed(self, hal_pin, data=None):
         if hal_pin.get() == 1:
+            if self.opration_mode == 'manual':
+                if self.manualCuttingProfileWidget.get_numberOfCuts() - 1 <= 0:
+                    
+                    self.stopManualBtn.get_child().set_from_file(filename="icons/stop_icon.png")
+                    self.stopManualBtn.set_sensitive(False)
+                    self.playManualBtn.set_sensitive(True)
+                    self.angleRightHeadManualBtn.set_sensitive(True)
+                    self.angleLeftHeadManualBtn.set_sensitive(True)  
+                    self.manualCuttingProfileWidget.set_sensitive(True)
+                    self.dxfViewerManual.set_sensitive(True) 
+                    self.settingsBtn.set_sensitive(True)
+                    self.alarmsBtn.set_sensitive(True)
+                    self.ioStatusBtn.set_sensitive(True)
+                    self.goHomePageBtn.set_sensitive(True)
+                    
+                    self.hal_pin_stop_move.set(True)
 
-            # if self.manualCuttingProfileWidget.get_numberOfCuts() > 0: 
-            #     self.manualCuttingProfileWidget.set_numberOfCuts(self.manualCuttingProfileWidget.get_numberOfCuts() - 1)
-            #     self.hal_pin_number_of_cuts.set(self.manualCuttingProfileWidget.get_numberOfCuts())
+            elif self.opration_mode == 'auto':
 
-            if self.manualCuttingProfileWidget.get_numberOfCuts() - 1 <= 0:
-                self.stopManualBtn.get_child().set_from_file(filename="icons/stop_icon.png")
-                self.stopManualBtn.set_sensitive(False)
-                self.playManualBtn.set_sensitive(True)
-                self.angleRightHeadManualBtn.set_sensitive(True)
-                self.angleLeftHeadManualBtn.set_sensitive(True)  
-                self.manualCuttingProfileWidget.set_sensitive(True) 
-                self.settingsBtn.set_sensitive(True)
-                self.alarmsBtn.set_sensitive(True)
-                self.ioStatusBtn.set_sensitive(True)
-                self.goHomePageBtn.set_sensitive(True)
-                
-                self.StopMove()
-                
+                pathX = self.hal_pin_cut_list_pathX_to_gui.get()
+                pathY = self.hal_pin_cut_list_pathY_to_gui.get()
+                self.csvViewerWidget.update_processed_row(f'{pathX}:{pathY}')
+                self.csvViewerWidget.save_csv_list()
+
+            elif self.opration_mode == 'stepSlide':
+
+                row = self.hal_pin_cut_step_slide_row_to_gui.get()
+                qty = self.hal_pin_cut_step_slide_qty_to_gui.get()
+                check = self.hal_pin_cut_step_slide_check_to_gui.get()
+
+                count = self.StepByStepCuttingProfileWidget.get_countProcessedCutsEntry() + 1
+                self.StepByStepCuttingProfileWidget.set_countProcessedCutsEntry(count)
+
+                self.StepByStepCuttingProfileWidget.update_row(row, qty, check)
+
+                self.StepByStepCuttingProfileWidget.save_data_values()
+
             hal_pin.set(False)
-
-    def on_number_of_cuts_changed(self, hal_pin, data=None):
-        self.manualCuttingProfileWidget.set_numberOfCuts(hal_pin.get())
-        
-    def StopMove(self):
-        # c = linuxcnc.command()
-        # c.abort()
-        # c.wait_complete()
-        self.stop_pulse = [True]
 
     def handle_cut_status(self, status):
         switcher = {
@@ -1175,40 +1314,19 @@ class DoubleMitreMachine(Gtk.Window):
             20: lambda: LogViewer().emit('public-msg', 'info', 'Info: Cut Only Right Saw Blade For Short Cut...'),
             21: lambda: LogViewer().emit('public-msg', 'info', 'Info: Press Busy Hands Buttons For Move To Recover Length Long Cut...'),
             23: lambda: LogViewer().emit('public-msg', 'info', 'Info: Cut List Cmpleted...'),
+            24: lambda: LogViewer().emit('public-msg', 'info', 'Info: Step Slide Cut...'),
+            25: lambda: LogViewer().emit('public-msg', 'info', 'Info: Press Busy Hands Buttons For Move To Recover Length Step Slide Cut...'),
         }
         # Obtener la función correspondiente al estado
         func = switcher.get(status, lambda: LogViewer().emit('public-msg', 'info', 'Info: Estado desconocido...'))
         # Llamar a la función
         func()
-
-    def on_update_cmds_timeout(self): 
-
-        self.pulse_on_hal_pin(None, self.start_manual_pulse, self.count_start_manual_pulse, [2], self.hal_pin_cut_start_manual)
-        self.pulse_on_hal_pin(None, self.stop_pulse, self.count_stop_pulse, [2], self.hal_pin_stop_move)
-
-        return True
     
-    def on_update_gui_timeout(self):
-
-        pos_fb_value = self.hal_pin_pos_fb.get()
-        if self.last_FbPos != pos_fb_value:
-            self.manualCuttingProfileWidget.set_FbPos(pos_fb_value)
-            self.autoFbPosEntry.set_text('%.*f'%(self.autoFbPosEntry.get_num_decimal_digits(),pos_fb_value))
-            self.last_FbPos = pos_fb_value
-
-        # e = linuxcnc.error_channel()
-        # error = e.poll()
-
-        # if error:
-        #     kind, text = error
-        #     text = text.replace('\n', '. ')
-        #     if kind in (linuxcnc.NML_ERROR, linuxcnc.OPERATOR_ERROR):
-        #         typus = "error"
-        #     else:
-        #         typus = "info"
-        #     LogViewer().emit('public-msg', typus, typus+': '+text)
-
-        return True
+    def on_pos_fb_changed(self, hal_pin, data=None):
+        pos_fb_value = hal_pin.get()
+        self.manualCuttingProfileWidget.set_FbPos(pos_fb_value)
+        self.autoFbPosEntry.set_text('%.*f'%(self.autoFbPosEntry.get_num_decimal_digits(),pos_fb_value))
+        self.StepByStepCuttingProfileWidget.set_FbPos(pos_fb_value)
 
     def postgui(self):
         postgui_halfile = self.inifile.find("HAL", "POSTGUI_HALFILE")
@@ -1216,7 +1334,6 @@ class DoubleMitreMachine(Gtk.Window):
 
      
 def main():
-    Gdk.threads_init()
     if len(sys.argv) > 2 and sys.argv[1] == '-ini':
         print("2", sys.argv[2])
         win = DoubleMitreMachine(sys.argv[2])
@@ -1238,3 +1355,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+

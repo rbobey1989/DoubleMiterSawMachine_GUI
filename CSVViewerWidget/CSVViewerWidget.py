@@ -21,8 +21,11 @@ class CSVViewerWidget(Gtk.Notebook):
         self.min_length = min_length
         self.max_height = max_height
 
+        self.filename = None
+
         self.csvViewerWidgetPages = {'mainCutListPage': 0, 'addCutCsvListPage': 1}
         self.set_current_page(self.csvViewerWidgetPages['mainCutListPage'])
+        self.insertData = 'uknown'
 
         vboxCutList = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         vboxAppendCut = Gtk.Box(orientation=Gtk.Orientation.VERTICAL,homogeneous=True)
@@ -31,8 +34,6 @@ class CSVViewerWidget(Gtk.Notebook):
         self.titleBar = Gtk.Entry(editable=False, can_focus=False)
         self.titleBar.set_name('titleBar')
         self.titleBar.set_property('xalign', 0.5)
-
-        self.titleBar.connect("focus-out-event", self.on_focus_out_event_title_bar)
 
         hboxList = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         hboxList.set_name('hboxTreeview')
@@ -160,6 +161,14 @@ class CSVViewerWidget(Gtk.Notebook):
 
         self.entryWithFocus = None
 
+        listNameLabel = Gtk.Label(label='List Name', name='labelIdicatorsEntryCsvCutData')
+        self.listNameEntry = Gtk.Entry(name='entryCsvCutData')
+        self.listNameEntry.set_editable(False)
+        self.listNameEntry.set_max_length(20)
+        self.listNameEntry.set_alignment(xalign=0.5)
+        self.listNameEntry.connect("focus-in-event", self.on_focus_in_event_entry)
+        self.listNameEntry.connect("focus-out-event", self.on_focus_out_event_entry)
+
         barNumberLabel = Gtk.Label(label='Bar Number', name='labelIdicatorsEntryCsvCutData')
         self.barNumberEntry = CSVViewerEntry( parent=self, 
                                              num_int_digits=4, 
@@ -251,8 +260,8 @@ class CSVViewerWidget(Gtk.Notebook):
         DescriptionLabel = Gtk.Label(label='Description', name='labelIdicatorsEntryCsvCutData')
         self.DescriptionEntry = Gtk.Entry(name = 'entryCsvCutData')
         self.DescriptionEntry.set_editable(False)
-        self.DescriptionEntry.connect("focus-in-event", self.on_focus_in_event_description)
-        self.DescriptionEntry.connect("focus-out-event", self.on_focus_out_event_description)
+        self.DescriptionEntry.connect("focus-in-event", self.on_focus_in_event_entry)
+        self.DescriptionEntry.connect("focus-out-event", self.on_focus_out_event_entry)
         
         gridCutData = Gtk.Grid()
         gridCutData.set_column_spacing(20)
@@ -261,33 +270,36 @@ class CSVViewerWidget(Gtk.Notebook):
         gridCutData.set_margin_bottom(10)
         gridCutData.set_margin_start(20)
         gridCutData.set_margin_end(10)
+
+        gridCutData.attach(listNameLabel, 0, 0, 1, 1)
+        gridCutData.attach(self.listNameEntry, 1, 0, 5, 1)
         
-        gridCutData.attach(barNumberLabel, 0, 0, 1, 1)
-        gridCutData.attach(self.barNumberEntry, 1, 0, 1, 1)
+        gridCutData.attach(barNumberLabel, 0, 1, 1, 1)
+        gridCutData.attach(self.barNumberEntry, 1, 1, 1, 1)
 
-        gridCutData.attach(heightLabel, 0, 1, 1, 1)
-        gridCutData.attach(self.heightEntry, 1, 1, 1, 1)
+        gridCutData.attach(heightLabel, 0, 2, 1, 1)
+        gridCutData.attach(self.heightEntry, 1, 2, 1, 1)
 
-        gridCutData.attach(topLengthLabel, 2, 0, 1, 1)
+        gridCutData.attach(topLengthLabel, 2, 1, 1, 1)
         hBoxTopLength = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         hBoxTopLength.pack_start(self.topLengthEntry, True, True, 0)
         hBoxTopLength.pack_end(self.changeTopLengthCheckBtn, False, True, 0)
-        gridCutData.attach(hBoxTopLength, 3, 0, 1, 1)
+        gridCutData.attach(hBoxTopLength, 3, 1, 1, 1)
 
-        gridCutData.attach(bottomLengthLabel, 2, 1, 1, 1)
+        gridCutData.attach(bottomLengthLabel, 2, 2, 1, 1)
         hBoxBottomLength = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
         hBoxBottomLength.pack_start(self.bottomLengthEntry, True, True, 0)
         hBoxBottomLength.pack_end(self.changeBottomLengthCheckBtn, False, True, 0)
-        gridCutData.attach(hBoxBottomLength, 3, 1, 1, 1)
+        gridCutData.attach(hBoxBottomLength, 3, 2, 1, 1)
 
-        gridCutData.attach(rightAngleLabel, 4, 0, 1, 1)
-        gridCutData.attach(self.rightAngleEntry, 5, 0, 1, 1)
+        gridCutData.attach(rightAngleLabel, 4, 1, 1, 1)
+        gridCutData.attach(self.rightAngleEntry, 5, 1, 1, 1)
 
-        gridCutData.attach(leftAngleLabel, 4, 1, 1, 1)
-        gridCutData.attach(self.leftAngleEntry, 5, 1, 1, 1) 
+        gridCutData.attach(leftAngleLabel, 4, 2, 1, 1)
+        gridCutData.attach(self.leftAngleEntry, 5, 2, 1, 1) 
 
-        gridCutData.attach(DescriptionLabel, 0, 2, 1, 1)
-        gridCutData.attach(self.DescriptionEntry, 1, 2, 6, 1)
+        gridCutData.attach(DescriptionLabel, 0, 3, 1, 1)
+        gridCutData.attach(self.DescriptionEntry, 1, 3, 6, 1)
 
         vboxAppendCut.pack_start(gridCutData, True, True, 0)
         vboxAppendCut.pack_start(self.virtualKeyboard, True, True, 0)
@@ -428,8 +440,10 @@ class CSVViewerWidget(Gtk.Notebook):
         self.treestore.clear()
         self.barWidget.update_bar([])
 
-        file_name = os.path.basename(filename)
-        self.titleBar.set_text(file_name)
+        self.filename = filename
+
+        basename = os.path.basename(filename)
+        self.titleBar.set_text(basename)
 
         with open(filename, 'r') as f:
             reader = csv.reader(f)
@@ -540,7 +554,7 @@ class CSVViewerWidget(Gtk.Notebook):
             db.close()
 
     def clear_csv(self):
-        if self.treestore is not None and len(self.treestore) > 0:
+        if self.treestore is not None and len(self.treestore) > 0 or self.filename is not None:
             dialog = Gtk.MessageDialog(self.get_toplevel_window(), 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
             dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
             dialog.get_style_context().add_class('dialog')
@@ -553,10 +567,14 @@ class CSVViewerWidget(Gtk.Notebook):
             else:
                 self.treestore.clear()
                 self.titleBar.set_text('')
+                self.filename = None
+
                 if self.barWidget != None:
                     self.barWidget.update_bar([])
                 if self.dxfViewerWidget != None:
                     self.dxfViewerWidget.clear_dxf()
+
+        
 
 
     def on_row_clicked(self, widget, event):
@@ -777,6 +795,14 @@ class CSVViewerWidget(Gtk.Notebook):
 
         return selected_rows
     
+    def update_processed_row(self, processed_row_path):
+        model = self.treestore
+        iter = model.get_iter(processed_row_path)
+        if iter is not None:
+            model[iter][0] = False
+            model[iter][1] = self.unchecked_pixbuf
+        
+    
     def show_current_line_cut(self, pathIterStr):
         if pathIterStr is not None:
             pathIter = Gtk.TreePath.new_from_string(pathIterStr)
@@ -792,29 +818,46 @@ class CSVViewerWidget(Gtk.Notebook):
     def set_dxfViewerWidget(self, dxfViewerWidget):
         self.dxfViewerWidget = dxfViewerWidget
 
-    def on_focus_out_event_title_bar(self, widget, event):
-        widget.set_can_focus(False)
-        if widget.get_text() == '':
-            widget.set_text('Untitled.csv')
-        elif widget.get_text()[-4:] != '.csv' :
-            widget.set_text(widget.get_text() + '.csv')
-        widget.set_editable(False)
+    # def on_focus_out_event_title_bar(self, widget, event):
+    #     widget.set_can_focus(False)
+    #     if widget.get_text() == '':
+    #         widget.set_text('Untitled.csv')
+    #     elif widget.get_text()[-4:].lower() != '.csv':
+    #         widget.set_text(widget.get_text() + '.csv')
+    #     self.filename = 'cuttingListData/' + widget.get_text()
+    #     widget.set_editable(False)
+    #     self.save_csv_list()
         
     def on_new_csv_list(self, widget):
-        # if self.treestore is not None and len(self.treestore) > 0:
-        #     dialog = Gtk.MessageDialog(self.get_toplevel_window(), 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
-        #     dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
-        #     dialog.get_style_context().add_class('dialog')
-        #     response = dialog.run()
-        #     dialog.destroy()
-        #     if response == Gtk.ResponseType.YES:
-        #         resp = self.on_save_csv_list()
-        #         if resp == Gtk.ResponseType.CANCEL:
-        #             return
-        self.clear_csv()
-        self.titleBar.set_editable(True)
-        self.titleBar.set_can_focus(True)
-        self.titleBar.grab_focus()
+        if self.treestore is not None and len(self.treestore) > 0:
+            dialog = Gtk.MessageDialog(self.get_toplevel_window(), 0, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, "CSV Viewer Widget")
+            dialog.format_secondary_text("Do you want to save the changes to the current CSV file?")
+            dialog.get_style_context().add_class('dialog')
+            response = dialog.run()
+            dialog.destroy()
+            if response == Gtk.ResponseType.YES:
+                resp = self.on_save_csv_list()
+                if resp == Gtk.ResponseType.CANCEL:
+                    return
+
+
+        self.listNameEntry.set_can_focus(True)
+        self.listNameEntry.grab_focus()
+        self.listNameEntry.set_text('Untitled')
+
+        self.barNumberEntry.set_sensitive(False)
+        self.topLengthEntry.set_sensitive(False)
+        self.bottomLengthEntry.set_sensitive(False)
+        self.heightEntry.set_sensitive(False)
+        self.leftAngleEntry.set_sensitive(False)
+        self.rightAngleEntry.set_sensitive(False)
+        self.DescriptionEntry.set_sensitive(False)
+        self.changeTopLengthCheckBtn.set_sensitive(False)
+        self.changeBottomLengthCheckBtn.set_sensitive(False)
+
+        self.insertData = 'name'
+        self.set_current_page(self.csvViewerWidgetPages['addCutCsvListPage'])
+
 
     def get_toplevel_window(self):
         widget = self
@@ -832,6 +875,7 @@ class CSVViewerWidget(Gtk.Notebook):
         dialog = Gtk.FileChooserDialog("Por favor elige un archivo", self.get_toplevel_window(),
         Gtk.FileChooserAction.SAVE,
         (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+        dialog.set_current_folder('cuttingListData')
         dialog.get_style_context().add_class('dialog')
         response = dialog.run()
         if response == Gtk.ResponseType.OK:
@@ -845,6 +889,16 @@ class CSVViewerWidget(Gtk.Notebook):
         dialog.destroy()
 
         return Gtk.ResponseType.OK
+    
+    def save_csv_list(self):
+        if self.treestore is None:
+            return
+        
+        with open(self.filename, 'w') as f:
+            writer = csv.writer(f)
+            self.write_rows(writer, self.get_treestore())
+        
+        return
 
     def on_add_profile_csv_list(self, widget):
         if self.dxfViewerWidget != None:
@@ -859,6 +913,22 @@ class CSVViewerWidget(Gtk.Notebook):
         model, iter = self.get_active_row()
         top_bar_used = 0
         bottom_bar_used = 0
+
+        self.insertData = 'cutData'
+
+        self.listNameEntry.set_can_focus(False)
+        self.listNameEntry.set_sensitive(False)
+
+        self.barNumberEntry.set_sensitive(True)
+        self.topLengthEntry.set_sensitive(True)
+        self.bottomLengthEntry.set_sensitive(False)
+        self.heightEntry.set_sensitive(True)
+        self.leftAngleEntry.set_sensitive(True)
+        self.rightAngleEntry.set_sensitive(True)
+        self.DescriptionEntry.set_sensitive(True)
+        self.changeTopLengthCheckBtn.set_sensitive(True)
+        self.changeBottomLengthCheckBtn.set_sensitive(True)
+
         if model is not None and iter is not None:
             if model[iter][2:5] != ['', '', '']:
                 db = DxfDataBase()
@@ -882,31 +952,40 @@ class CSVViewerWidget(Gtk.Notebook):
         model, iter = self.get_active_row()
 
         if key == 'cancel':
+            self.insertData = 'uknown'
             self.set_current_page(self.csvViewerWidgetPages['mainCutListPage'])
             return
         elif key == 'accept':
 
-            space, bar_number = self.has_enough_space(float(self.topLengthEntry.get_text()), float(self.bottomLengthEntry.get_text()))
+            if self.insertData == 'cutData':
 
-            self.treestore.append(iter, [True, self.checked_pixbuf, 
-                                         '', '', '', '', 
-                                         bar_number, 
-                                         ' ⬆ ' if self.changeTopLengthCheckBtn.get_active() else ' ⬇ ',
-                                         self.topLengthEntry.get_text(),
-                                         self.bottomLengthEntry.get_text(), 
-                                         self.heightEntry.get_text(),
-                                         self.leftAngleEntry.get_text(), 
-                                         self.rightAngleEntry.get_text(),  
-                                         '0', 
-                                         '', 
-                                         '', 
-                                         self.DescriptionEntry.get_text()]) 
-            self.sort_treestore_by_bar_number() 
+                space, bar_number = self.has_enough_space(float(self.topLengthEntry.get_text()), float(self.bottomLengthEntry.get_text()))
+                self.treestore.append(iter, [True, self.checked_pixbuf, 
+                                            '', '', '', '', 
+                                            bar_number, 
+                                            ' ⬆ ' if self.changeTopLengthCheckBtn.get_active() else ' ⬇ ',
+                                            self.topLengthEntry.get_text(),
+                                            self.bottomLengthEntry.get_text(), 
+                                            self.heightEntry.get_text(),
+                                            self.leftAngleEntry.get_text(), 
+                                            self.rightAngleEntry.get_text(),  
+                                            '0', 
+                                            '', 
+                                            '', 
+                                            self.DescriptionEntry.get_text()]) 
+                self.sort_treestore_by_bar_number() 
+                self.treestore.emit('row-changed', self.treestore.get_path(iter), iter)
+
+            elif self.insertData == 'name':
+
+                self.clear_csv()
+                self.titleBar.set_text(self.listNameEntry.get_text() + '.csv')
+                self.filename = 'cuttingListData/' + self.listNameEntry.get_text() + '.csv'
             
-            self.treestore.emit('row-changed', self.treestore.get_path(iter), iter)
+            self.insertData = 'uknown'
+            self.save_csv_list()
             self.set_current_page(self.csvViewerWidgetPages['mainCutListPage'])
             return
-
 
         if self.entryWithFocus is None:
             print('entryWithFocus is None')
@@ -915,9 +994,13 @@ class CSVViewerWidget(Gtk.Notebook):
             if key == 'Backspace':
                 self.entryWithFocus.set_text(self.entryWithFocus.get_text()[:-1])
             elif key == 'clear':
-                print('clear')
                 self.entryWithFocus.set_text('')
             else: 
+                if self.entryWithFocus == self.listNameEntry:
+                    patron = r'^[a-zA-Z0-9_-]*$'
+                    if not re.match(patron, self.listNameEntry.get_text() + key):
+                        return
+                
                 self.entryWithFocus.set_text(self.entryWithFocus.get_text() + key)
 
     def has_enough_space(self, new_cut_top_length, new_cut_bottom_length):
@@ -993,10 +1076,10 @@ class CSVViewerWidget(Gtk.Notebook):
             for row_data in data:
                 model.append(iter, row_data)
 
-    def on_focus_in_event_description(self, widget, event):
+    def on_focus_in_event_entry(self, widget, event):
         self.entryWithFocus = widget
 
-    def on_focus_out_event_description(self, widget, event):
+    def on_focus_out_event_entry(self, widget, event):
         self.entryWithFocus = None
 
     def set_entry_with_focus(self, entry):
@@ -1057,11 +1140,6 @@ class CSVViewerWidget(Gtk.Notebook):
         self.delLineCsvListBtn.set_sensitive(state)      
         self.clearCsvListBtn.set_sensitive(state) 
         self.treeview.set_sensitive(state)
-
-
-
-
-
 
 
 class CSVViewerEntry(Gtk.Entry,Gtk.Editable): 

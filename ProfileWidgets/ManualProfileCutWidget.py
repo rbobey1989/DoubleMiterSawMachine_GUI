@@ -15,7 +15,7 @@ from .EntryWithNumpad import myAlign
 class ManualProfileCutWidget(Gtk.Overlay):
     __gsignals__ = {
         'update-value': (GObject.SignalFlags.RUN_FIRST, None, (EntryNumpad,float)),
-        'bad-value': (GObject.SignalFlags.RUN_FIRST, None, (bool,))
+        'bad-value': (GObject.SignalFlags.RUN_FIRST, None, (bool,)),
     }
     def __init__(
         self, 
@@ -87,7 +87,7 @@ class ManualProfileCutWidget(Gtk.Overlay):
 
         self.add_overlay(drawingArea) 
         self.connect('get-child-position',self.on_get_child_position) 
-        self.connect('update-value', self.on_update_value)  
+        self.connect('update-value', self.on_update_value)
 
         self.topLengthProfileEntry = EntryNumpad(self,
                                                  label='entryTopLengths',
@@ -653,5 +653,3 @@ class ManualProfileCutWidget(Gtk.Overlay):
     
     def set_dxfViewer(self,dxfViewer):
         self.dxfViewer = dxfViewer
-
-

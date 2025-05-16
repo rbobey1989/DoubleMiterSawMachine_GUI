@@ -13,11 +13,13 @@ from LogViewer.LogViewer import LogViewer
 
 
 class myBtnEstoptoggleAction(Gtk.EventBox):   
-    def __init__(self):
+    def __init__(self,notebook,mainPage):
         super(myBtnEstoptoggleAction,self).__init__()
         self.EstopToggleAction = EMC_ToggleAction_ESTOP()
         self.EstopToggleAction._hal_init()
         self.gstat = GStat()
+        self.notebook = notebook
+        self.mainPage = mainPage
         
         self.add(Gtk.Image.new_from_file(filename="icons/estop_icon_pressed.png"))
 
@@ -35,6 +37,8 @@ class myBtnEstoptoggleAction(Gtk.EventBox):
     def on_state_estop(self, widget):
         LogViewer().emit('public-msg', 'warning', 'Warning: Estop Activate...')
         self.get_child().set_from_file(filename="icons/estop_icon_pressed.png")
+        self.notebook.set_current_page(self.mainPage)
+
 
     def on_state_estop_reset(self, widget):
         LogViewer().emit('public-msg', 'info', 'Info: Estop Deactivate...')

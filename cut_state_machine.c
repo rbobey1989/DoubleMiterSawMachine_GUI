@@ -16,8 +16,9 @@ MODULE_LICENSE("GPL v2");
 
 static int num_instances = 1; // Número de instancias del componente
 
-static int list_buffer_size;		/* number of channels */
+static int list_buffer_size;
 static int default_list_buffer_size = 100;
+
 RTAPI_MP_INT(list_buffer_size, "list buffer size");
 
 typedef struct {
@@ -41,6 +42,15 @@ typedef struct{
     bool used;
 } cut_t;
 
+typedef struct {
+    float length;
+    float pieces_length;
+    uint32_t qty;
+    float left_angle;
+    uint32_t row;
+    bool used;
+} step_slide_cut_t;
+
 // Estados de la máquina de estados
 typedef enum {
     IDLE                                                                   ,
@@ -51,6 +61,7 @@ typedef enum {
     SHORT_CUT                                                              ,
     NORMAL_CUT                                                             ,
     LONG_CUT                                                               ,
+    STEP_SLIDE_CUT                                                         ,
     WAITING_FOR_LOW_LEVEL_START_MOVE_SIGNAL                                ,
     WAITING_FOR_LOW_LEVEL_IN_POS_SIGNAL                                    ,
     WAITING_FOR_MACHINE_IN_POSITION                                        ,
@@ -63,12 +74,15 @@ typedef enum {
     SAW_BLADE_OUTPUT_CONTROLLED_BY_TIME                                    ,
     SAW_BLADE_OUTPUT_CONTROLLED_BY_USER                                    ,
     CHANGE_STATE_CLAMPS_LONG_CUT_FOR_STEP_1_2                              ,
+    CHANGE_STATE_CLAMPS_STEP_SLIDE_CUT_FOR_STEP_1_2                        ,
     DELAY_OPEN_CLAMPS                                                      ,
     SEND_CUT_COMPLETE_MSG                                                  ,
     DEACTIVATE_BREAK                                                       ,
     ACTIVATE_BREAK                                                         ,
     PROCESSING_CUT_LIST                                                    ,
-    WAITING_FOR_CUT_LIST_TO_BE_UPDATED                                     
+    WAITING_FOR_CUT_LIST_TO_BE_UPDATED                                     ,
+    WAITING_FOR_STEP_SLIDE_CUT_LIST_TO_BE_UPDATED                          ,
+    PROCESSING_STEP_SLIDE_CUT_LIST
 } cut_state_t;
 
 
@@ -87,7 +101,8 @@ typedef struct {
     hal_float_t         ferror;                                     // Entrada longitud de corte
     hal_bit_t           angle_head_type_actuator;                   // Tipo de actuador para posicionamiento de cabezales
     hal_float_t         min_cut_top_position;                       // Posición del tope mínimo
-    hal_float_t         home_pos;                                  // Posición de home
+    hal_float_t         disc_thickness;                              // Espesor del disco de corte
+    // hal_float_t         home_pos;                                  // Posición de home
 
     hal_bit_t           *estop;                                     // Entrada de estop
     hal_u32_t           *status;                                    // Salida de estado
@@ -108,7 +123,6 @@ typedef struct {
     uint8_t             print_cut_list_state;
     uint32_t            list_index;
 
-    hal_bit_t           *cut_add;
     hal_float_t         *list_bottom_cut_length;                         // Entrada longitud de corte inferior
     hal_float_t         *list_top_cut_length;                            // Entrada longitud de corte superior
     hal_float_t         *list_height_cut_length;                         // Entrada altura de corte
@@ -123,8 +137,34 @@ typedef struct {
     hal_s32_t           *cut_list_fifo_curr_depth;
     hal_bit_t           *free_cut_list;
     hal_bit_t           *print_cut_list;
-    hal_bit_t           *wr_cut_list;
     bool                cut_list_updated;
+    hal_bit_t           *cut_list_complete;                              // Salida de lista de cortes completa
+    hal_u32_t           *cut_list_lines;                                 // Salida de número de líneas de la lista de cortes
+
+    step_slide_cut_t    *step_slide_cut_list;
+    uint8_t             add_step_slide_cut_to_list_state;
+    uint32_t            step_slide_cut_list_num_cuts;
+    bool                step_slide_cut_list_updated;
+    uint32_t            step_slide_cut_list_index;
+    float               step_slide_target_length;
+    float               step_slide_pieces_length;
+    uint32_t            step_slide_qty;
+    float               step_slide_left_angle;
+    uint32_t            step_slide_row;
+    bool                step_slide_check;
+    
+    hal_u32_t           *step_slide_cut_row;                        // Entrada fila de corte paso a paso
+    hal_float_t         *step_slide_cut_length;                     // Entrada longitud de corte paso a paso
+    hal_float_t         *step_slide_cut_pieces_length;              // Entrada longitud de corte paso a paso
+    hal_u32_t           *step_slide_cut_qty;                        
+    hal_float_t         *step_slide_cut_left_angle; 
+    hal_bit_t           *step_slide_cut_fifo_empty;
+    hal_s32_t           *step_slide_cut_fifo_curr_depth;
+    hal_bit_t           *step_slide_cut_list_complete;
+    hal_u32_t           *step_slide_cut_row_to_gui;                        // Salisa fila de corte paso a paso
+    hal_u32_t           *step_slide_cut_qty_to_gui;                        // Salisa qty de corte paso a paso 
+    hal_bit_t           *step_slide_cut_check_to_gui;
+    hal_u32_t           *step_slide_cut_list_lines; 
 
     hal_bit_t           *in_pos;                                    // Entrada de realimentación de posición
     hal_float_t         *bottom_cut_length;                         // Entrada longitud de corte inferior
@@ -206,6 +246,7 @@ static cut_state_machine_t *cut_state_machine;          // Estructura de la máq
 bool init_params_edge_detector = false;                 // Inicialización de parámetros de edge detector
 bool wait_for_msg = false;                              // Espera de mensaje
 uint8_t step_long_cut = 0;                              // Paso de corte largo
+uint8_t step_step_slide_cut = 0;                        // Paso de corte paso a paso
 bool skip_cut = false;                                  // Salto de corte
 
 
@@ -220,6 +261,9 @@ static const char 	*prefix = PREFIX;
 
 #define ADD_CUT_TO_LIST                                                                 1
 #define LIST_UPDATED                                                                    2
+
+#define ADD_STEP_SLIDE_CUT_TO_LIST                                                      1
+#define STEP_SLIDE_LIST_UPDATED                                                         2
 
 #define WAITING_FOR_PRINT_CUT_LIST                                                      1
 #define PRINT_CUT_LIST                                                                  2
@@ -247,6 +291,9 @@ static const char 	*prefix = PREFIX;
 #define PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_LONG_CUT        21
 #define PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_FINISH_LONG_CUT                22
 #define CUT_LIST_COMPLETED                                              23
+#define STEP_SLIDE_CUT_TYPE                                             24
+#define PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_STEP_SLIDE_CUT  25
+
 
 
 // Type Head Actuator
@@ -257,6 +304,7 @@ static const char 	*prefix = PREFIX;
 #define COUNT_MSG                           100
 #define COUNT_CLAMP_OPEN_LONG_CUT           1000
 #define COUNT_CLAMP_OPEN                    500
+#define COUNT_CLAMP_OPEN_STEP_SLIDE_CUT     1000
 #define COUNT_BREAK                         1000
 
 
@@ -264,6 +312,8 @@ static const char 	*prefix = PREFIX;
 #define MANUAL_OPERATION_MODE               1
 #define AUTO_OPERATION_MODE                 2
 #define STEP_SLIDE_OPERATION_MODE           3
+
+#define STEP_SLIDE_ROWS                     5
 
 /******************************************************************************
 *               Decalracion de funciones locales                                                                            *   
@@ -274,6 +324,7 @@ void edges_detection_update(void *arg, long period);
 uint8_t edge_detector(edge_detector_t *detector, uint8_t in_signal_value);
 
 void update_cut_list(void *arg, long period);
+void update_step_slide_cut_list(void *arg, long period);
 
 // void add_cut_to_list(void *arg, long period);
 // void clear_cut_list(void *arg, long period);
@@ -316,8 +367,11 @@ int rtapi_app_main(void) {
     retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->min_cut_top_position), comp_id, "%s.min-cut-top-position", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->home_pos), comp_id, "%s.home-pos", prefix);
+    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->disc_thickness), comp_id, "%s.disc-thickness", prefix);
     if (retval != 0) goto error;
+
+    // retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->home_pos), comp_id, "%s.home-pos", prefix);
+    // if (retval != 0) goto error;
 
     if (!list_buffer_size) {
         cut_state_machine->cut_list_max_size = default_list_buffer_size;
@@ -344,6 +398,22 @@ int rtapi_app_main(void) {
     for (int i = 0; i < cut_state_machine->cut_list_max_size; i++) {
         cut_state_machine->cut_list[i].used = false;
     }
+
+    // Asignar memoria para la lista de cortes paso a paso
+    cut_state_machine->step_slide_cut_list = hal_malloc(STEP_SLIDE_ROWS * sizeof(step_slide_cut_t));
+    if (cut_state_machine->step_slide_cut_list == NULL) {
+        rtapi_print_msg(RTAPI_MSG_ERR, "%s: ERROR: hal_malloc() failed for cut_list\n", MODNAME);
+        hal_exit(comp_id);
+        return -1;
+    }
+
+    cut_state_machine->add_step_slide_cut_to_list_state = IDLE;
+    
+    for (int i = 0; i < STEP_SLIDE_ROWS; i++) {
+        cut_state_machine->step_slide_cut_list[i].used = false;
+    }
+
+
 
     retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->estop), comp_id, "%s.estop", prefix);
     if (retval != 0) goto error;
@@ -374,27 +444,20 @@ int rtapi_app_main(void) {
     if (retval != 0) goto error;
     *(cut_state_machine->move_to_length) = 0;
 
-    // retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_move), comp_id, "%s.start-move", prefix);
-    // if (retval != 0) goto error;
-    // *(cut_state_machine->start_move) = 0;
-
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->stop_move), comp_id, "%s.stop-move", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->stop_move), comp_id, "%s.stop-move", prefix);
     if (retval != 0) goto error;
 
     retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->cut_complete), comp_id, "%s.cut-complete", prefix);
     if (retval != 0) goto error;
     *(cut_state_machine->cut_complete) = 0;
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->start_manual_cut), comp_id, "%s.start-manual-cut", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_manual_cut), comp_id, "%s.start-manual-cut", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->start_auto_cut), comp_id, "%s.start-auto-cut", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_auto_cut), comp_id, "%s.start-auto-cut", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->start_step_slide_cut), comp_id, "%s.start-step-slide-cut", prefix);
-    if (retval != 0) goto error;
-
-    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->cut_add), comp_id, "%s.cut-add", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->start_step_slide_cut), comp_id, "%s.start-step-slide-cut", prefix);
     if (retval != 0) goto error;
 
     retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->list_bottom_cut_length), comp_id, "%s.list-bottom-cut-length", prefix);
@@ -439,7 +502,46 @@ int rtapi_app_main(void) {
     retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->print_cut_list), comp_id, "%s.print-cut-list", prefix);
     if (retval != 0) goto error;
 
-    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->wr_cut_list), comp_id, "%s.wr-cut-list", prefix);
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->cut_list_complete), comp_id, "%s.cut-list-complete", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->cut_list_lines), comp_id, "%s.cut-list-lines", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->step_slide_cut_row), comp_id, "%s.step-slide-cut-row", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->step_slide_cut_length), comp_id, "%s.step-slide-cut-length", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->step_slide_cut_pieces_length), comp_id, "%s.step-slide-cut-pieces-length", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->step_slide_cut_qty), comp_id, "%s.step-slide-cut-qty", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_float_newf(HAL_IN, &(cut_state_machine->step_slide_cut_left_angle), comp_id, "%s.step-slide-cut-left-angle", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IN, &(cut_state_machine->step_slide_cut_fifo_empty), comp_id, "%s.step-slide-cut-fifo-empty", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_s32_newf(HAL_IN, &(cut_state_machine->step_slide_cut_fifo_curr_depth), comp_id, "%s.step-slide-cut-fifo-curr-depth", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->step_slide_cut_list_complete), comp_id, "%s.step-slide-cut-list-complete", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_OUT, &(cut_state_machine->step_slide_cut_row_to_gui), comp_id, "%s.step-slide-row-to-gui", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_OUT, &(cut_state_machine->step_slide_cut_qty_to_gui), comp_id, "%s.step-slide-qty-to-gui", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_bit_newf(HAL_OUT, &(cut_state_machine->step_slide_cut_check_to_gui), comp_id, "%s.step-slide-check-to-gui", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_pin_u32_newf(HAL_IN, &(cut_state_machine->step_slide_cut_list_lines), comp_id, "%s.step-slide-list-lines", prefix);
     if (retval != 0) goto error;
 
     /*********************************************************************************************
@@ -604,6 +706,14 @@ int rtapi_app_main(void) {
         hal_exit(comp_id);
     }
 
+    rtapi_snprintf(name, sizeof(name), "%s.update-step-slide-cut-list", prefix);
+    retval = hal_export_funct(name, update_step_slide_cut_list, cut_state_machine, 1, 0, comp_id);
+    if (retval != 0) {
+        rtapi_print_msg(RTAPI_MSG_ERR,
+                "%s: ERROR: update function export failed\n", modname);
+        hal_exit(comp_id);
+    }
+
     // rtapi_snprintf(name, sizeof(name), "%s.add-cut-to-list", prefix);
     // retval = hal_export_funct(name, add_cut_to_list, cut_state_machine, 1, 0, comp_id);
     // if (retval != 0) {
@@ -648,8 +758,11 @@ void update_cut_state_machine(void *arg, long period){
         *(cut_state_machine->status) = 0;
         *(cut_state_machine->right_clamp) = 0;
         *(cut_state_machine->left_clamp) = 0;
-        *(cut_state_machine->right_head) = 0;
-        *(cut_state_machine->left_head) = 0;
+        // if(!*(cut_state_machine->stop_move))
+        // {
+        //     *(cut_state_machine->right_head) = 0;
+        //     *(cut_state_machine->left_head) = 0;
+        // }
         *(cut_state_machine->left_saw_blade) = 0;
         *(cut_state_machine->right_saw_blade) = 0;
         *(cut_state_machine->left_saw_blade_output_move) = 0;
@@ -666,25 +779,38 @@ void update_cut_state_machine(void *arg, long period){
         cut_state_machine->clamps_button_state = false;
         cut_state_machine->init_left_cut = false;
         cut_state_machine->init_right_cut = false;
-        //*(cut_state_machine->start_move) = 0;
-        *(cut_state_machine->stop_move) = 0;
-        cut_state_machine->cut_list_updated = false;
-        cut_state_machine->operation_mode = NOT_OPERATION_MODE;
         step_long_cut = 0;
+        
+        cut_state_machine->cut_list_updated = false;
         cut_state_machine->cut_list_num_cuts = 0;
         cut_state_machine->list_index = 0;
         *(cut_state_machine->list_line_path_update) = 0;
         *(cut_state_machine->list_line_pathX_to_gui) = 0;
         *(cut_state_machine->list_line_pathY_to_gui) = 0;
+        *(cut_state_machine->cut_list_complete) = 0;
         for (int i = 0; i < cut_state_machine->cut_list_max_size; i++) {
-            // if (!cut_state_machine->cut_list[i].used)
-            // {
-            //     break;
-            // }
             cut_state_machine->cut_list[i].used = false;
         }
 
+        step_step_slide_cut = 0;
+        cut_state_machine->step_slide_cut_list_updated = false;
+        cut_state_machine->step_slide_cut_list_num_cuts = 0;
+        cut_state_machine->step_slide_cut_list_index = 0;
+        *(cut_state_machine->step_slide_cut_list_complete) = 0;
+        *(cut_state_machine->step_slide_cut_row_to_gui) = 0;
+        *(cut_state_machine->step_slide_cut_qty_to_gui) = 0;
+        *(cut_state_machine->step_slide_cut_check_to_gui) = 0;
+        for (int i = 0; i < STEP_SLIDE_ROWS; i++) {
+            cut_state_machine->step_slide_cut_list[i].used = false;
+        }
+
+
+        cut_state_machine->operation_mode = NOT_OPERATION_MODE;
+        *(cut_state_machine->stop_move) = 0;
+        
         cut_state_machine->state = IDLE;
+        cut_state_machine->add_cut_to_list_state = IDLE;
+        cut_state_machine->add_step_slide_cut_to_list_state = IDLE;
     }
     else
     { 
@@ -735,6 +861,8 @@ void update_cut_state_machine(void *arg, long period){
                             cut_state_machine->current_cut_type = LONG_CUT;
                         }
 
+
+                        *(cut_state_machine->start_manual_cut) = 0;
                         cut_state_machine->state = POSITIONING_HEAD_ANGLES;
                     }
                     else if (*(cut_state_machine->start_auto_cut))
@@ -745,7 +873,9 @@ void update_cut_state_machine(void *arg, long period){
                     }
                     else if (*(cut_state_machine->start_step_slide_cut))
                     {
-                        rtapi_print("Start Step Slide Cut\n");
+                        cut_state_machine->operation_mode = STEP_SLIDE_OPERATION_MODE;
+                        cut_state_machine->current_cut_type = STEP_SLIDE_CUT;
+                        cut_state_machine->state = WAITING_FOR_STEP_SLIDE_CUT_LIST_TO_BE_UPDATED;
                     }
 
                 break; 
@@ -757,30 +887,32 @@ void update_cut_state_machine(void *arg, long period){
                 }
                 break;
 
+            case WAITING_FOR_STEP_SLIDE_CUT_LIST_TO_BE_UPDATED:
+                if (cut_state_machine->step_slide_cut_list_updated)
+                {
+                    cut_state_machine->state = PROCESSING_STEP_SLIDE_CUT_LIST;
+                }
+                break;
+
             case POSITIONING_HEAD_ANGLES:
                 if (cut_state_machine->angle_head_type_actuator == PNEUMATIC_ACTUATOR)
                 {
-                    //rtapi_print("*********************************\n");
                     if (cut_state_machine->left_head_pos_value < 90)
                     {
-                        *(cut_state_machine->left_head) = 1;
-                        //rtapi_print("left_head = 1\n");
+                        *(cut_state_machine->left_head) = 0;
                     }
                     else
                     {
-                        *(cut_state_machine->left_head) = 0;
-                        //rtapi_print("left_head = 0\n");
+                        *(cut_state_machine->left_head) = 1;
                     }
 
                     if (cut_state_machine->right_head_pos_value < 90)
                     {
-                        *(cut_state_machine->right_head) = 1;
-                        //rtapi_print("right_head = 1\n");
+                        *(cut_state_machine->right_head) = 0;
                     }
                     else
                     {
-                        *(cut_state_machine->right_head) = 0;
-                        //rtapi_print("right_head = 0\n");
+                        *(cut_state_machine->right_head) = 1;
                     }
                 }
 
@@ -822,16 +954,24 @@ void update_cut_state_machine(void *arg, long period){
                             *(cut_state_machine->status) = LONG_CUT_TYPE;
                             cut_state_machine->state = LONG_CUT;
                             break;
+                        case STEP_SLIDE_CUT:
+                            *(cut_state_machine->status) = STEP_SLIDE_CUT_TYPE;
+                            cut_state_machine->state = STEP_SLIDE_CUT;
+                            break;
                     }
 
                 break;
 
             case NORMAL_CUT:
 
-                if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->bottom_cut_length_value) > cut_state_machine->ferror)
+                float normal_correction_disc1 = cut_state_machine->disc_thickness/(2*sin(cut_state_machine->left_head_pos_value*M_PI/180)); 
+                float normal_correction_disc2 = cut_state_machine->disc_thickness/(2*sin(cut_state_machine->right_head_pos_value*M_PI/180));
+                float normal_corrected_length = cut_state_machine->bottom_cut_length_value + normal_correction_disc1 + normal_correction_disc2;
+
+                if (fabs(*(cut_state_machine->pos_fb) - normal_corrected_length) > cut_state_machine->ferror)
                 {
-                    *(cut_state_machine->move_to_length) = cut_state_machine->bottom_cut_length_value;
-                    cut_state_machine->lenght_in_pos_value = cut_state_machine->bottom_cut_length_value;
+                    *(cut_state_machine->move_to_length) = normal_corrected_length;
+                    cut_state_machine->lenght_in_pos_value = normal_corrected_length;
                     cut_state_machine->state = DEACTIVATE_BREAK;
                 }
                 else
@@ -849,6 +989,7 @@ void update_cut_state_machine(void *arg, long period){
             case WAITING_FOR_MACHINE_IN_POSITION:
                 if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->lenght_in_pos_value) <= cut_state_machine->ferror)
                 {
+
                     cut_state_machine->state = ACTIVATE_BREAK;
                 }
                 break;
@@ -889,6 +1030,14 @@ void update_cut_state_machine(void *arg, long period){
                             *(cut_state_machine->left_clamp) = 1;
                         }
                     }
+                    else if (cut_state_machine->current_cut_type == STEP_SLIDE_CUT)
+                    {
+                        if (step_step_slide_cut == 0)
+                        {
+                            *(cut_state_machine->right_clamp) = 1;
+                            *(cut_state_machine->left_clamp) = 1;
+                        }
+                    }
 
                     *(cut_state_machine->status) = PRESS_BUSY_HANDS_BUTTONS_FOR_CUT;
                     cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT;
@@ -901,6 +1050,12 @@ void update_cut_state_machine(void *arg, long period){
                         *(cut_state_machine->right_clamp) = 1;
                         *(cut_state_machine->left_clamp) = 1;
                         cut_state_machine->state = CHANGE_STATE_CLAMPS_LONG_CUT_FOR_STEP_1_2;
+                    }
+                    else if (cut_state_machine->current_cut_type == STEP_SLIDE_CUT && !(step_step_slide_cut == 0))
+                    {
+                        *(cut_state_machine->right_clamp) = 1;
+                        *(cut_state_machine->left_clamp) = 1;
+                        cut_state_machine->state = CHANGE_STATE_CLAMPS_STEP_SLIDE_CUT_FOR_STEP_1_2;
                     }
                     else
                     {
@@ -931,6 +1086,27 @@ void update_cut_state_machine(void *arg, long period){
 
                     }
                     cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT;
+                }
+                break;
+
+            case CHANGE_STATE_CLAMPS_STEP_SLIDE_CUT_FOR_STEP_1_2:
+                if (step_step_slide_cut == 1)
+                {
+                    *(cut_state_machine->right_clamp) = 1;
+                    *(cut_state_machine->left_clamp) = 0;
+                    cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT;
+                }
+                else if (step_step_slide_cut == 2)
+                {
+                    cut_state_machine->delay_count++;
+                    if (cut_state_machine->delay_count == COUNT_CLAMP_OPEN_STEP_SLIDE_CUT)
+                    {
+                        cut_state_machine->delay_count = 0;
+                        *(cut_state_machine->right_clamp) = 1;
+                        *(cut_state_machine->left_clamp) = 1;
+                        *(cut_state_machine->status) = PRESS_BUSY_HANDS_BUTTONS_FOR_CUT;
+                        cut_state_machine->state = WAITING_FOR_BUSY_HANDS_BUTTONS_TO_BE_PRESSED_TO_CUT;    
+                    }
                 }
                 break;
 
@@ -1027,7 +1203,30 @@ void update_cut_state_machine(void *arg, long period){
                             }
                             
                         }
-
+                        else if (cut_state_machine->current_cut_type == STEP_SLIDE_CUT)
+                        {
+                            if (step_step_slide_cut == 0 || step_step_slide_cut == 2)
+                            {
+                                if (!(*(cut_state_machine->left_saw_blade)))
+                                {
+                                    *(cut_state_machine->status) = TURN_ON_LEFT_SAW_BLADE_AND_PRESS_HANDS_BUSY_BUTTONS;
+                                }
+                                else
+                                {
+                                    *(cut_state_machine->status) = CUT_ONLY_LEFT_SAW_BLADE;
+                                    cut_state_machine->init_left_cut = true;
+                                    cut_state_machine->init_right_cut = false;
+                                    wait_for_msg = true;
+                                }
+                            }
+                            else if (step_step_slide_cut == 1)
+                            {
+                                cut_state_machine->init_left_cut = false;
+                                cut_state_machine->init_right_cut = false;
+                                wait_for_msg = true;
+                                skip_cut = true;
+                            }
+                        }
                     }
                 }
 
@@ -1155,7 +1354,8 @@ void update_cut_state_machine(void *arg, long period){
                 break;
 
             case DELAY_OPEN_CLAMPS:
-                if (!(cut_state_machine->current_cut_type == LONG_CUT && (step_long_cut == 0 || step_long_cut == 1)))
+                if (!(cut_state_machine->current_cut_type == LONG_CUT && (step_long_cut == 0 || step_long_cut == 1)) 
+                    && !(cut_state_machine->current_cut_type == STEP_SLIDE_CUT))
                 {
                     cut_state_machine->delay_count++;
                     if (cut_state_machine->delay_count == COUNT_CLAMP_OPEN)
@@ -1196,6 +1396,7 @@ void update_cut_state_machine(void *arg, long period){
                         else
                         {
                             cut_state_machine->state = CHECK_MODE_OPERATION;
+                            *(cut_state_machine->cut_complete) = 1;
 
                         }
                         cut_state_machine->number_of_cuts_value--;
@@ -1206,6 +1407,36 @@ void update_cut_state_machine(void *arg, long period){
                         cut_state_machine->state = LONG_CUT;
                     }
                 }
+                else if (cut_state_machine->current_cut_type == STEP_SLIDE_CUT)
+                {
+                    step_step_slide_cut++;
+                    if (step_step_slide_cut == 3)
+                    {
+                        step_step_slide_cut = 1;
+                        if (cut_state_machine->step_slide_qty > 1)
+                        {
+                            cut_state_machine->state = SELECT_CUT_TYPE;
+                            cut_state_machine->step_slide_check = 1;
+                        }
+                        else
+                        {
+                            step_step_slide_cut = 0;
+                            *(cut_state_machine->right_clamp) = 0;
+                            *(cut_state_machine->left_clamp) = 0;
+                            cut_state_machine->step_slide_check = 0;
+                            cut_state_machine->state = CHECK_MODE_OPERATION;
+                        }
+                        cut_state_machine->step_slide_qty--;
+                        *(cut_state_machine->step_slide_cut_qty_to_gui) = cut_state_machine->step_slide_qty;
+                        *(cut_state_machine->step_slide_cut_row_to_gui) = cut_state_machine->step_slide_row;
+                        *(cut_state_machine->step_slide_cut_check_to_gui) = cut_state_machine->step_slide_check;
+                        *(cut_state_machine->cut_complete) = 1;
+                    }
+                    else
+                    {
+                        cut_state_machine->state = STEP_SLIDE_CUT;
+                    }
+                }
                 else
                 {
                     if (cut_state_machine->number_of_cuts_value > 1)
@@ -1214,8 +1445,8 @@ void update_cut_state_machine(void *arg, long period){
                     }
                     else
                     {
-                        
                         cut_state_machine->state = CHECK_MODE_OPERATION;
+                        *(cut_state_machine->cut_complete) = 1;
 
                     }
                     cut_state_machine->number_of_cuts_value--;
@@ -1224,21 +1455,32 @@ void update_cut_state_machine(void *arg, long period){
                 break;
 
             case CHECK_MODE_OPERATION:
-                switch (cut_state_machine->operation_mode)
+
+                if (!*(cut_state_machine->cut_complete))
                 {
-                    case MANUAL_OPERATION_MODE:
-                        *(cut_state_machine->cut_complete) = 1;
-                        cut_state_machine->state = IDLE;
-                        break;
-                    case AUTO_OPERATION_MODE:
-                        cut_state_machine->state = PROCESSING_CUT_LIST;
-                        break;
+                    switch (cut_state_machine->operation_mode)
+                    {
+                        case MANUAL_OPERATION_MODE:
+                            cut_state_machine->state = IDLE;
+                            break;
+                        case AUTO_OPERATION_MODE:
+                            cut_state_machine->state = PROCESSING_CUT_LIST;
+                            break;
+                        case STEP_SLIDE_OPERATION_MODE:
+                            cut_state_machine->state = PROCESSING_STEP_SLIDE_CUT_LIST;
+                            break;
+                    }
+                    break;
                 }
+
                 break;
+
             
             case SHORT_CUT:
 
                 float short_cut_length;
+                float short_correction_disc2 = cut_state_machine->disc_thickness/(2*sin(cut_state_machine->right_head_pos_value*M_PI/180));
+                float short_corrected_length;
 
                 if (cut_state_machine->bottom_cut_length_value < cut_state_machine->top_cut_length_value)
                 {
@@ -1249,10 +1491,12 @@ void update_cut_state_machine(void *arg, long period){
                     short_cut_length = cut_state_machine->bottom_cut_length_value;
                 }
 
-                if (fabs(*(cut_state_machine->pos_fb) - short_cut_length - cut_state_machine->min_cut_top_position) > cut_state_machine->ferror)
+                short_corrected_length = short_cut_length + short_correction_disc2;
+
+                if (fabs(*(cut_state_machine->pos_fb) - short_corrected_length - cut_state_machine->min_cut_top_position) > cut_state_machine->ferror)
                 {
-                    *(cut_state_machine->move_to_length) = short_cut_length + cut_state_machine->min_cut_top_position;
-                    cut_state_machine->lenght_in_pos_value = short_cut_length + cut_state_machine->min_cut_top_position;
+                    *(cut_state_machine->move_to_length) = short_corrected_length + cut_state_machine->min_cut_top_position;
+                    cut_state_machine->lenght_in_pos_value = short_corrected_length + cut_state_machine->min_cut_top_position;
                     cut_state_machine->state = DEACTIVATE_BREAK;
                 }
 
@@ -1269,9 +1513,17 @@ void update_cut_state_machine(void *arg, long period){
                         cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit;
                         cut_state_machine->state = DEACTIVATE_BREAK;
                     }
+                    else
+                    {
+                        cut_state_machine->state = ACTIVATE_BREAK;
+                    }
                 }
                 else if (step_long_cut == 1)
                 {
+                    float long_correction_disc1 = cut_state_machine->disc_thickness/(2*sin(cut_state_machine->left_head_pos_value*M_PI/180));
+                    float long_correction_disc2 = cut_state_machine->disc_thickness/(2*sin(cut_state_machine->right_head_pos_value*M_PI/180));
+
+
                     cut_state_machine->delay_count++;
                     if (cut_state_machine->delay_count == COUNT_CLAMP_OPEN)
                     {
@@ -1283,16 +1535,59 @@ void update_cut_state_machine(void *arg, long period){
                     {
                         break;
                     }
-                    if (fabs(*(cut_state_machine->pos_fb) - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value)) > cut_state_machine->ferror)
+                    if (fabs(*(cut_state_machine->pos_fb) - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2)) > cut_state_machine->ferror)
                     {
-                        *(cut_state_machine->move_to_length) = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value);
-                        cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value);
+                        *(cut_state_machine->move_to_length) = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2);
+                        cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2);
                         cut_state_machine->state = DEACTIVATE_BREAK;
                         *(cut_state_machine->status) = PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_LONG_CUT;
                     }
 
                 }
 
+                break;
+
+
+            case STEP_SLIDE_CUT:
+
+                if (step_step_slide_cut == 0)
+                {
+                    if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->step_slide_target_length) > cut_state_machine->ferror)
+                    {
+                        *(cut_state_machine->move_to_length) = cut_state_machine->step_slide_target_length;
+                        cut_state_machine->lenght_in_pos_value = cut_state_machine->step_slide_target_length;
+                        cut_state_machine->state = DEACTIVATE_BREAK;
+                    }
+                }
+                else if (step_step_slide_cut == 1)
+                {
+                    float step_slide_correction_disc1 = cut_state_machine->disc_thickness/sin(cut_state_machine->left_head_pos_value*M_PI/180);
+
+                    cut_state_machine->delay_count++;
+                    if (cut_state_machine->delay_count == COUNT_CLAMP_OPEN)
+                    {
+                        cut_state_machine->delay_count = 0;
+                        *(cut_state_machine->left_clamp) = 0;
+                        *(cut_state_machine->right_clamp) = 1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                    
+                    if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1) > cut_state_machine->ferror)
+                    {
+                        *(cut_state_machine->move_to_length) = *(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1;
+                        cut_state_machine->lenght_in_pos_value = *(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1;
+                        cut_state_machine->state = DEACTIVATE_BREAK;
+                        *(cut_state_machine->status) = PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_STEP_SLIDE_CUT;
+                    }
+
+                }
+                else if (step_step_slide_cut == 2)
+                {
+                    cut_state_machine->state = ACTIVATE_BREAK;
+                }
                 break;
 
             case PROCESSING_CUT_LIST:
@@ -1330,10 +1625,40 @@ void update_cut_state_machine(void *arg, long period){
                 {
                     cut_state_machine->list_index = 0;
                     *(cut_state_machine->status) = CUT_LIST_COMPLETED;
+                    *(cut_state_machine->cut_list_complete) = 1;
                     cut_state_machine->state = IDLE;
                 }
 
                 break;
+
+            case PROCESSING_STEP_SLIDE_CUT_LIST:
+                
+                if (cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_index].used == true)
+                {
+
+                    cut_state_machine->step_slide_target_length = cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_index].length;
+                    cut_state_machine->step_slide_pieces_length = cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_index].pieces_length;
+                    cut_state_machine->step_slide_qty = cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_index].qty;
+                    cut_state_machine->left_head_pos_value = cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_index].left_angle;
+                    cut_state_machine->step_slide_row = cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_index].row;
+                    cut_state_machine->right_head_pos_value = 90;
+
+                    cut_state_machine->step_slide_cut_list_index++;
+                    if (cut_state_machine->step_slide_qty != 0)
+                    {
+                        cut_state_machine->state = POSITIONING_HEAD_ANGLES;
+                    }
+                }
+                else
+                {
+                    cut_state_machine->step_slide_cut_list_index = 0;
+                    *(cut_state_machine->status) = CUT_LIST_COMPLETED;
+                    *(cut_state_machine->step_slide_cut_list_complete) = 1;
+                    cut_state_machine->state = IDLE;
+                }
+
+                break;
+
 
         }   
     
@@ -1355,6 +1680,8 @@ void update_cut_state_machine(void *arg, long period){
                         {
                             *(cut_state_machine->homing_break_deactivate) = 1;
                             *(cut_state_machine->move_to_length) = 0;
+                            *(cut_state_machine->left_head) = 1;
+                            *(cut_state_machine->right_head) = 1;
                             cut_state_machine->break_state = WAITING_FOR_HOMING_START_LOW_LEVEL;
                         }
                         else
@@ -1509,12 +1836,12 @@ void update_cut_list(void *arg, long period) {
                 new_cut->used = true;
 
                 cut_state_machine->cut_list_num_cuts++;
-            }
-            else
-            {
-                cut_state_machine->add_cut_to_list_state = LIST_UPDATED;
-            }
 
+                if (*(cut_state_machine->cut_list_lines) == cut_state_machine->cut_list_num_cuts)
+                {
+                    cut_state_machine->add_cut_to_list_state = LIST_UPDATED;
+                } 
+            }
             break;
 
         case LIST_UPDATED:
@@ -1524,6 +1851,55 @@ void update_cut_list(void *arg, long period) {
 
     }
 }
+
+void update_step_slide_cut_list(void *arg, long period) {
+
+    switch (cut_state_machine->add_step_slide_cut_to_list_state)
+    {
+        case IDLE:
+            cut_state_machine->step_slide_cut_list_num_cuts = 0;
+
+            if (*(cut_state_machine->start_step_slide_cut))
+            {
+                *(cut_state_machine->start_step_slide_cut) = 0;
+                cut_state_machine->add_step_slide_cut_to_list_state = ADD_STEP_SLIDE_CUT_TO_LIST;
+            }
+            break;
+
+        case ADD_STEP_SLIDE_CUT_TO_LIST:
+            if (!*(cut_state_machine->step_slide_cut_fifo_empty))
+            {
+                cut_state_machine->step_slide_cut_list_updated = false;
+
+                step_slide_cut_t *new_cut = NULL;
+
+                new_cut = &cut_state_machine->step_slide_cut_list[cut_state_machine->step_slide_cut_list_num_cuts];
+
+                new_cut->length = *(cut_state_machine->step_slide_cut_length);
+                new_cut->pieces_length = *(cut_state_machine->step_slide_cut_pieces_length);
+                new_cut->qty = *(cut_state_machine->step_slide_cut_qty);
+                new_cut->left_angle = *(cut_state_machine->step_slide_cut_left_angle);
+                new_cut->row = *(cut_state_machine->step_slide_cut_row);
+                new_cut->used = true;
+
+                cut_state_machine->step_slide_cut_list_num_cuts++;
+
+                if (*(cut_state_machine->step_slide_cut_list_lines) == cut_state_machine->step_slide_cut_list_num_cuts)
+                {
+                    cut_state_machine->add_step_slide_cut_to_list_state = STEP_SLIDE_LIST_UPDATED;                 
+                }
+
+            }
+            break;
+
+        case STEP_SLIDE_LIST_UPDATED:
+            cut_state_machine->step_slide_cut_list_updated = true;
+            cut_state_machine->add_step_slide_cut_to_list_state = IDLE;
+            break;
+    }
+
+}
+
 
 
 void print_list(void *arg, long period) {
