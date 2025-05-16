@@ -1,32 +1,25 @@
 # Halshow settings
 # This file is generated automatically.
-wm geometry . 736x719+-73+103
-placeFrames 0.40030911901081917
-set ::ratio 0.40030911901081917
+wm geometry . 698x610+2988+214
+placeFrames 0.3183453237410072
+set ::ratio 0.3183453237410072
 set ::old_w_leftf 160
 set ::watchlist {
     pin+cut_sm.left-saw-blade-output-move
     pin+cut_sm.right-saw-blade-output-move
     pin+streamer.0.empty
     pin+streamer.0.curr-depth
+    pin+j0.smc.in
     pin+cut_sm.list-cut-left-angle
     pin+cut_sm.list-height-cut-length
     pin+cut_sm.right-head
     pin+cut_sm.left-head
-    pin+cut_sm.move-to-length
-    pin+joint.1.pos-cmd
-    pin+joint.1.pos-fb
-    pin+joint.1.motor-pos-cmd
-    pin+joint.1.motor-pos-fb
-    pin+j1.smc.in
-    pin+j1.smc.out
-    pin+j1.smc.load
-    pin+cut_sm.homing
-    pin+joint.1.posthome-cmd
-    pin+motion.motion-enabled
-    pin+motion.enable
-    pin+joint.1.homed
-    pin+joint.1.homing
+    pin+cut_sm.right-saw-blade
+    pin+cut_sm.left-saw-blade
+    pin+DoubleMitreSawMachine.cut-start-auto
+    pin+cut_sm.right-clamp
+    pin+cut_sm.left-clamp
+    pin+cut_sm.breaks
 }
 set ::workmode watchhal
 set ::watchInterval 100

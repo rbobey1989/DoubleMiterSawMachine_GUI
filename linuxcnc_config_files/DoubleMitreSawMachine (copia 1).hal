@@ -6,18 +6,13 @@ loadrt [KINS]KINEMATICS
 #autoconverted  trivkins
 # motion controller, get name and thread periods from ini file
 loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS unlock_joints_mask=0x01 
-
-loadrt smc                  names=j0.smc
-loadrt and2                 count=1
-loadrt not                  count=1
-loadrt sim_axis_hardware    names=sim-hardware
-loadrt cut_state_machine    list_buffer_size=1000
-loadrt streamer             depth=100,20 cfg=FFFFFUU,FFUFU
-
-setp j0.smc.min    [JOINT_0]AXIS_MIN_LIMIT
-setp j0.smc.max    [JOINT_0]AXIS_MAX_LIMIT
-setp j0.smc.maxv   [JOINT_0]MAX_VELOCITY
-setp j0.smc.maxa   [JOINT_0]MAX_ACCELERATION
+# load 6 differentiators (for velocity and accel signals
+loadrt ddt names=ddt_x,ddt_xv
+loadrt and2 count=1
+loadrt not count=1
+loadrt sim_axis_hardware names=sim-hardware
+loadrt cut_state_machine list_buffer_size=1000
+loadrt streamer depth=100 cfg=FFFFFUU
 
 setp sim-hardware.Xmaxsw-upper  1000
 setp sim-hardware.Xmaxsw-lower  [JOINT_0]MAX_LIMIT
@@ -26,12 +21,12 @@ setp sim-hardware.Xminsw-lower  -1000
 setp sim-hardware.Xhomesw-pos   [JOINT_0]HOME_OFFSET
 setp sim-hardware.Xhomesw-hyst  0.6
 
-setp cut_sm.min-limit [JOINT_0]AXIS_MIN_LIMIT
-setp cut_sm.max-limit [JOINT_0]AXIS_MAX_LIMIT
-setp cut_sm.ferror    [JOINT_0]FERROR
+
+setp cut_sm.min-limit [AXIS_X]MIN_LIMIT
+setp cut_sm.max-limit [AXIS_X]MAX_LIMIT
+setp cut_sm.ferror [JOINT_0]FERROR
 setp cut_sm.angle-head-type-actuator [MACHINE_FEATURES]ANGLE_HEAD_TYPE_ACTUATOR
 setp cut_sm.min-cut-top-position     [MACHINE_FEATURES]MIN_CUT_TOP_POSITION
-setp cut_sm.disc-thickness           [MACHINE_FEATURES]DISC_THICKNESS
 
 setp cut_sm.clamps-btn-both 0
 setp cut_sm.clamps-btn-in-edge 0
@@ -41,10 +36,14 @@ setp cut_sm.busy-hand-btns-both 0
 setp cut_sm.busy-hand-btns-in-edge 0
 setp cut_sm.busy-hand-btns-out-width-pulses 1
 
+#setp cut_sm.cut-list-max-size 1000
+
 # add motion controller functions to servo thread
 addf motion-command-handler servo-thread
 addf motion-controller servo-thread
-addf j0.smc servo-thread
+# link the differentiator functions into the code
+#addf ddt_x servo-thread
+#addf ddt_xv servo-thread
 addf sim-hardware.update servo-thread
 addf cut_sm.update-cut-sm servo-thread
 addf cut_sm.edges-detection-update servo-thread
@@ -52,28 +51,52 @@ addf cut_sm.edges-detection-update servo-thread
 #addf cut_sm.clear-cut-list servo-thread
 addf cut_sm.print-list servo-thread
 addf cut_sm.update-cut-list servo-thread
-addf cut_sm.update-step-slide-cut-list servo-thread
 addf and2.0 servo-thread
 addf not.0 servo-thread
 addf streamer.0 servo-thread
-addf streamer.1 servo-thread
+
+
+#net busy_hand_btns => not.0.in
+#net not_busy_hand_btns motion.feed-inhibit <= not.0.out
+net feed_inhibit motion.feed-inhibit <= cut_sm.feed-inhibit 
 
 # create HAL signals for position commands from motion module
 # loop position commands back to motion module feedback
 
-net  j1_pos                 joint.0.motor-pos-cmd   =>  joint.0.motor-pos-fb sim-hardware.Xcurrent-pos  
-net  j1_in                  cut_sm.move-to-length   =>  j0.smc.in
-net  j1_out                 j0.smc.out              =>  joint.0.posthome-cmd
-net  j1_en_homed            joint.0.homed           =>  and2.0.in0 
-net  j1_en_feed_inhibit     cut_sm.feed-inhibit     =>  and2.0.in1
-net  j1_en                  and2.0.out              =>  j0.smc.enable
 
-net stop_move               =>  cut_sm.stop-move
+net Xpos1 joint.0.motor-pos-cmd => joint.0.motor-pos-fb ddt_x.in sim-hardware.Xcurrent-pos cut_sm.pos-fb  
+
+net move_to_length <= cut_sm.move-to-length
+net start_move <= cut_sm.start-move
+net stop_move => cut_sm.stop-move
+net in_pos cut_sm.in_pos <= motion.in-position
 
 net clamps_btn => cut_sm.clamps-button
 
-net j0home  joint.0.home-sw-in  => sim-hardware.Xhomesw-out
-net j0homing  joint.0.homing    => sim-hardware.Xhoming cut_sm.homing
+
+#net fake-all-home        sim-hardware.homesw-all
+#net fake-all-limit       sim-hardware.limitsw-all
+#net fake-all-limit-home  sim-hardware.limitsw-homesw-all
+
+#net fake-both-x          sim-hardware.Xbothsw-out
+#net fake-max-x           sim-hardware.Xmaxsw-out
+#net fake-min-x           sim-hardware.Xminsw-out
+
+
+net fake-home-x  joint.0.home-sw-in        sim-hardware.Xhomesw-out
+
+
+#net fake-both-home-x     sim-hardware.Xbothsw-homesw-out
+#net fake-max-home-x      sim-hardware.Xmaxsw-homesw-out
+#net fake-min-home-x      sim-hardware.Xminsw-homesw-out
+
+net xhoming  joint.0.homing => sim-hardware.Xhoming cut_sm.homing
+
+
+# send the position commands thru differentiators to
+# generate velocity and accel signals
+#net Xvel ddt_x.out => ddt_xv.in
+#net Xacc <= ddt_xv.out
 
 # estop loopback
 net estop-loop iocontrol.0.user-enable-out iocontrol.0.emc-enable-in cut_sm.estop

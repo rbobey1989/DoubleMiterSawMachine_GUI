@@ -1,0 +1,20 @@
+True,KOMERLING,OLIMPYC,SM 5450.dxf,6500,,,,,,,,,0,,
+False,,,,,1,TOP,500,430.00,70.00,45,90,0,0,,Description1
+False,,,,,1,TOP,450,450.00,70.00,90,90,0,0,,Description2
+False,,,,,2,TOP,1000,860.00,70.00,45,45,0,0,,Description5
+False,,,,,2,TOP,465,395.00,70.00,90,45,0,0,,Description6
+True,ZUCHO,SALNESTEC,SM 5508.dxf,6500,,,,,,,,,0,,
+True,,,,,1,BOTTOM,744.99,616.09,76.00,35,75,0,0,,Description9
+False,,,,,1,BOTTOM,489.00,413.00,76.00,90,45,0,0,,Description10
+False,,,,,2,BOTTOM,789.00,755.16,76.00,66,90,0,0,,Description13
+False,,,,,2,BOTTOM,456.00,428.34,76.00,90,70,0,0,,Description14
+False,DEFINE,BY,USER,6500,,,,,,,,,0,,
+False,,,,,1,TOP,500,652.00,76.00,135,135,0,0,,Description1
+False,,,,,1,TOP,450,450.00,76.00,90,90,0,0,,Description2
+False,,,,,2,TOP,1000,1000.00,76.00,90,90,0,0,,Description5
+False,,,,,2,TOP,465,465.00,76.00,90,90,0,0,,Description6
+False,DECEUNINCK,INDUSTRIAL,SM 5457.dxf,6500,,,,,,,,,0,,
+False,,,,,1,BOTTOM,500,500.00,70.00,135,45,0,0,,Description1
+False,,,,,1,BOTTOM,450.00,450.00,70.00,45,135,0,0,,Description2
+False,,,,,2,BOTTOM,1000,1070.00,70.00,135,90,0,0,,Description5
+False,,,,,2,BOTTOM,465.00,535.00,70.00,135,90,0,0,,Description6
