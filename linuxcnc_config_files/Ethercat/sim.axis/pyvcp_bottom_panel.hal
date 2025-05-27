@@ -1,0 +1,12 @@
+# #########################################
+# Example hal file showing some linkages
+# of pyvcp_widgets
+
+# second row of dials and scales
+#net dial2scale0 pyvcp.scale.0.param_pin <= pyvcp.dial0
+#net dial2scale1 pyvcp.scale.1.param_pin <= pyvcp.dial1
+#net dial2scale2 pyvcp.scale.2.param_pin <= pyvcp.dial2
+#net dial2scale3 pyvcp.scale.3.param_pin <= pyvcp.dial3
+
+net check2el4032_2_en pyvcp.analog-out-en => lcec.0.EL4032.aout-1-enable
+net scale2el4032_2_value pyvcp.scale0-f => lcec.0.EL4032.aout-1-value

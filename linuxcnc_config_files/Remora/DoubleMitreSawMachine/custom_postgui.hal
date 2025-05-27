@@ -1,0 +1,69 @@
+# Incluya sus comandos HAL custom_postgui aquí
+# Este archivo no se sobrescribirá cuando vuelva a ejecutar stepconf
+
+net j0_pos_fb_gui                   joint.0.pos-fb    => DoubleMitreSawMachine.pos-fb cut_sm.pos-fb
+net move_to_length                  => DoubleMitreSawMachine.move-to-length 
+net stop_move                       <= DoubleMitreSawMachine.stop-move
+############################################################################################################################
+net bottom_length_cut       DoubleMitreSawMachine.bottom-cut-length     => cut_sm.bottom-cut-length 
+net top_length_cut          DoubleMitreSawMachine.top-cut-length        => cut_sm.top-cut-length 
+net height_cut_length       DoubleMitreSawMachine.height-cut-length     => cut_sm.height-cut-length 
+net start_manual_cut        DoubleMitreSawMachine.cut-start-manual      => cut_sm.start-manual-cut
+net start_auto_cut          DoubleMitreSawMachine.cut-start-auto        => cut_sm.start-auto-cut
+net start_step_slide_cut    DoubleMitreSawMachine.cut-start-step-slide  => cut_sm.start-step-slide-cut
+net status                  DoubleMitreSawMachine.cut-status            <= cut_sm.status
+net left_angle_cut          DoubleMitreSawMachine.cut-left-angle        => cut_sm.cut-left-angle 
+net right_angle_cut         DoubleMitreSawMachine.cut-right-angle       => cut_sm.cut-right-angle 
+net left_saw_blade          DoubleMitreSawMachine.left-saw-blade-btn    => cut_sm.left-saw-blade-btn
+net right_saw_blade         DoubleMitreSawMachine.right-saw-blade-btn   => cut_sm.right-saw-blade-btn
+net saw_blade_output_time   DoubleMitreSawMachine.saw-blade-output-time => cut_sm.saw-blade-output-time
+net number_of_cuts          DoubleMitreSawMachine.number-of-cuts        => cut_sm.number-of-cuts
+net cut_complete            DoubleMitreSawMachine.cut-complete          => cut_sm.cut-complete
+net homing_start            DoubleMitreSawMachine.homing-start          => cut_sm.homing-start
+
+net homing_break_deactivate DoubleMitreSawMachine.homing-break-deactivate <= cut_sm.homing-break-deactivate
+
+net free_cut_list           DoubleMitreSawMachine.free-cut-list     => cut_sm.free-cut-list
+net print_cut_list          DoubleMitreSawMachine.print-cut-list    => cut_sm.print-cut-list
+net cut_list_complete       DoubleMitreSawMachine.cut-list-complete => cut_sm.cut-list-complete
+
+net busy_hand_btns          DoubleMitreSawMachine.busy-hand-btns => cut_sm.busy-hand-btns
+net clamps_btn              <= DoubleMitreSawMachine.clamps-btn
+
+############################################################################################################################
+
+net list_top_cut_length         streamer.0.pin.0 => cut_sm.list-top-cut-length
+net list_bottom_cut_length      streamer.0.pin.1 => cut_sm.list-bottom-cut-length
+net list_cut_height             streamer.0.pin.2 => cut_sm.list-height-cut-length
+net list_cut_left_angle         streamer.0.pin.3 => cut_sm.list-cut-left-angle
+net list_cut_right_angle        streamer.0.pin.4 => cut_sm.list-cut-right-angle
+net list_line_pathX             streamer.0.pin.5 => cut_sm.list-line-pathX
+net list_line_pathY             streamer.0.pin.6 => cut_sm.list-line-pathY
+
+net list_fifo_empty             streamer.0.empty => cut_sm.cut-list-fifo-empty
+net list_fifo_curr_depth        streamer.0.curr-depth => cut_sm.cut-list-fifo-curr-depth
+net cut_list_lines              DoubleMitreSawMachine.cut-list-lines => cut_sm.cut-list-lines
+
+net list_line_pathX_to_gui      cut_sm.list-line-pathX-to-gui => DoubleMitreSawMachine.list-line-pathX-to-gui
+net list_line_pathY_to_gui      cut_sm.list-line-pathY-to-gui => DoubleMitreSawMachine.list-line-pathY-to-gui
+net list_line_path_update       cut_sm.list-line-path-update  => DoubleMitreSawMachine.list-line-path-update
+
+############################################################################################################################
+
+net step_slide_cut_lst_complete DoubleMitreSawMachine.step-slide-list-complete => cut_sm.step-slide-cut-list-complete
+
+net step_slide_cut_length       streamer.1.pin.0 => cut_sm.step-slide-cut-length
+net step_slide_cut_pieces       streamer.1.pin.1 => cut_sm.step-slide-cut-pieces-length
+net step_slide_cut_qty          streamer.1.pin.2 => cut_sm.step-slide-cut-qty
+net step_slide_cut_left_angle   streamer.1.pin.3 => cut_sm.step-slide-cut-left-angle
+net step_slide_cut_row          streamer.1.pin.4 => cut_sm.step-slide-cut-row
+
+net step_slide_cut_empty        streamer.1.empty => cut_sm.step-slide-cut-fifo-empty
+net step_slide_cut_curr_depth   streamer.1.curr-depth => cut_sm.step-slide-cut-fifo-curr-depth
+net step_slide_list_lines       DoubleMitreSawMachine.step-slide-list-lines => cut_sm.step-slide-list-lines
+
+net step_slide_cut_row_to_gui   cut_sm.step-slide-row-to-gui => DoubleMitreSawMachine.step-slide-row-to-gui
+net step_slide_cut_qty_to_gui   cut_sm.step-slide-qty-to-gui => DoubleMitreSawMachine.step-slide-qty-to-gui
+net step_slide_cut_check_to_gui cut_sm.step-slide-check-to-gui => DoubleMitreSawMachine.step-slide-check-to-gui
+
+

@@ -1,0 +1,205 @@
+
+#header {
+    background: rgb(54, 56, 58);
+	padding-top: 10px;
+	padding-left: 10px;
+	padding-right: 10px;
+	padding-bottom: 10px;
+	border-bottom-style: solid;
+	border-bottom-color: rgb(99, 102, 106);
+	border-bottom-width: 5px;			
+}
+
+#footer {
+    background: rgb(54, 56, 58);
+	padding-top: 5px;
+	padding-right: 10px;
+	padding-left: 10px;
+	border-top-style: solid;
+	border-top-color: rgb(99, 102, 106);
+	border-top-width: 5px;	
+}
+
+
+
+#notebookPages {
+	background: rgb(128, 132, 137);
+}
+
+/***********************************************************/
+/* Entries Styles */
+
+.entry-font-red {
+    color: red;
+}
+
+
+#entryWithNumpadStepByStepWidget {
+    font-size: 24px;
+    background-color: white;
+    caret-color:      white;
+    border-width:     4px;
+    box-shadow: 5px 5px 5px 5px rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+}
+
+/*#labelIdicatorsEntryWithNumpadManualWidget {
+    font-size: 20px;
+    color: white;
+    text-shadow: 2px 2px 4px #000000;
+}*/
+
+/***********************************************************/
+/* TreeView Styles */
+
+#scrolled_window scrollbar {
+    -GtkScrollbar-has-backward-stepper: true;
+    -GtkScrollbar-has-forward-stepper: true;
+}
+
+#scrolled_window scrollbar slider {
+    /* Tamaño del slider */
+    min-width: 30px;
+    min-height: 20px;
+    border-radius: 10px;
+
+    /* Color del slider */
+    background-color: #a5a4a1;
+}
+
+#scrolled_window scrollbar trough {
+    /* Color del trough */
+    background-color: #d8d7d7;
+}
+
+#scrolled_window scrollbar button {
+    /* Tamaño de los botones */
+    min-width: 30px;
+    min-height: 20px;
+
+    /* Color de los botones */
+    background-color: #a3a3a3;
+}
+
+#titleBar {
+    background: rgb(54, 56, 58);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    padding-top: 5px;
+    padding-right: 5px;
+    padding-left: 5px;
+    padding-bottom: 5px;
+}
+
+.titleBar-with-border {
+    border: 2px solid rgb(233, 11, 11);
+}
+
+#listTreeview, #infoBarLabel {
+    font-size: 24px; /* Ajusta el tamaño de la fuente a tus necesidades */
+	font-weight: bold; /* Hace que la fuente sea negrita */
+    
+}
+
+#hboxTreeview {
+	background: rgb(255,255,255);
+}
+
+#treeviewButton, #dxfExplorerButton, #infoBarOkButton, .dialog button {
+	color: rgb(63, 55, 55);
+    font-size: 20px;
+}
+
+#treeviewButton:hover, #dxfExplorerButton:hover, #infoBarOkButton:hover, .dialog button:hover {
+	color: #FFF;
+	background: rgb(63, 55, 55);
+}
+
+#treeviewButton:active, #treeviewButton:checked, #dxfExplorerButton:active, #dxfExplorerButton:checked, #infoBarOkButton:active, #infoBarOkButton:checked, .dialog button:active{
+	color: #FFF;
+	background: rgb(233, 11, 11);	
+}
+
+#dxfExplorerLabel {
+    font-size: 20px;
+    color: white;
+    text-shadow: 2px 2px 4px #000000;
+}
+
+#dxfExplorerEntry {
+	font-size: 16px;
+}
+
+.dialog button image{
+    opacity: 0;
+}
+
+.dialog title {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+#labelIdicatorsEntryCsvCutData {
+    font-size: 30px;
+    color: white;
+    text-shadow: 2px 2px 4px #000000;
+}
+
+#entryCsvCutData {
+    font-size: 30px;
+    background-color: white;
+    caret-color:      white;
+    border-width:     4px;
+    box-shadow: 5px 5px 5px 5px rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+}
+
+#entryCsvFbPos {
+    font-size: 50px;
+    background-color: white;
+    caret-color:      white;
+    border-width:     4px;
+    box-shadow: 5px 5px 5px 5px rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+    margin-top: 20px;  
+    margin-bottom: 20px;
+    margin-left: 50px;
+    margin-right: 50px;
+}
+
+/***************************************************/
+
+#log_entry_row {
+    font-size: 32px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+}
+
+#log_row {
+    padding: 1px;
+    margin: 0;
+    border-width: 0;
+    min-height: 0;
+}
+
+#testBtn {
+    font-size: 20px;
+    padding-top: 0px;
+    padding-bottom: 0px;
+    /* Estilos adicionales para el botón en su estado normal */
+}
+
+#testBtn:active {
+    /* Estilos para cuando el botón está siendo presionado */
+    background: #4CAF50; /* Verde */
+    color: white;
+}
+
+#testBtn:checked, #testBtn.active {
+    /* Estilos para cuando el ToggleButton está activo/toggled */
+    background: #4CAF50; /* Verde */
+    color: white;
+}
+
+/***************************************************/

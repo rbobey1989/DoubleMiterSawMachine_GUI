@@ -1,0 +1,6 @@
+# Estos archivos se cargan después de la GUI, en el orden en que aparecen
+# Generado por stepconf 1.1 en Sat May 18 16:24:14 2024
+# Si realiza cambios en este archivo, serán
+# sobrescrito cuando ejecuta stepconf nuevamente
+
+source custom_postgui.hal

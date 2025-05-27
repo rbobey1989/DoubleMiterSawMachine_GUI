@@ -1,0 +1,25 @@
+
+#DXFViewerButton {
+	color: rgb(63, 55, 55);
+    font-size: 20px;
+}
+
+#DXFViewerButton:hover {
+	color: #FFF;
+	background: rgb(63, 55, 55);
+}
+
+#DXFViewerButton:active {
+	color: #FFF;
+	background: rgb(233, 11, 11);
+}
+
+#DXFViewerLabel {
+    font-size: 20px;
+    color: white;
+    text-shadow: 2px 2px 4px #000000;
+}
+
+#DXFViewerCombobox {
+	font-size: 16px;
+}

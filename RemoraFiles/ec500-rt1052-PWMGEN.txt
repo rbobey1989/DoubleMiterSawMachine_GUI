@@ -4,12 +4,23 @@
 	{
 	"Thread": "Base",
 	"Type": "PwmGen",
-        "Comment":"Test PWMGEN",
+        "Comment":"JOINT_0 PWMGEN",
         "Joint Number":0,
         "PWM No":1,
-        "PWM Frequency":10000,
+        "PWM Frequency":40000,
 	"Min Duty Cycle":0,
-	"Max Duty Cycle":100
+	"Max Duty Cycle":98
+	},
+	{
+	"Thread": "Base",
+	"Type": "QDC",
+        "Comment":"JOINT_0 QDC Encoder A-WHA B-WHB",
+        "PV[i]":0,
+        "ChA Pin":"P3_16",
+        "ChB Pin":"P3_17",
+	"ENC No":1,
+	"Filter PER":0,
+	"Filter CNT":0
 	}
 	]
 }

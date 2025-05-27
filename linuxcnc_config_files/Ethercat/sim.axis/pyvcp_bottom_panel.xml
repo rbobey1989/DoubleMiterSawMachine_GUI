@@ -1,0 +1,31 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<pyvcp>
+    <hbox>
+        <labelframe>
+            <bd>2</bd>
+            <relief>RAISED</relief> 
+            <hbox>
+                <checkbutton>
+                    <halpin>"analog-out-en"</halpin>
+                    <text>"Enable"</text>
+                </checkbutton>
+                <scale>
+                    <width>"15"</width>
+                    <halpin>"scale0"</halpin>
+                    <resolution>0.01</resolution>
+                    <orient>VERTICAL</orient>
+                    <initval>0</initval>
+                    <min_>-0.6</min_>
+                    <max_>0.6</max_>
+                    <param_pin>1</param_pin>
+                </scale>
+                </hbox>
+        </labelframe>
+        <label>
+            <text>"   "</text>
+        </label>
+ 
+    </hbox>
+</pyvcp>
+
+
