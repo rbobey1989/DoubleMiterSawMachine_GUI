@@ -1,0 +1,94 @@
+
+# first load all the RT modules that will be needed
+# kinematics
+loadrt [KINS]KINEMATICS
+# motion controller, get name and thread periods from INI file
+loadrt [EMCMOT]EMCMOT base_period_nsec=[EMCMOT]BASE_PERIOD servo_period_nsec=[EMCMOT]SERVO_PERIOD num_joints=[KINS]JOINTS
+# load 6 differentiators (for velocity and accel signals
+
+# Add PID
+loadrt pid names=pid_x
+
+loadusr -W lcec_conf ethercat-conf.xml
+loadrt lcec
+
+loadrt sim_axis_hardware    names=sim-hardware
+
+addf lcec.read-all servo-thread
+
+#----- PID -------
+addf pid_x.do-pid-calcs         servo-thread
+
+# add motion controller functions to servo thread
+addf motion-command-handler servo-thread
+addf motion-controller servo-thread
+
+
+addf sim-hardware.update                    servo-thread
+
+addf lcec.write-all servo-thread
+
+# Set Parameter 
+# X-Axis
+setp lcec.0.EL4032.aout-0-max-dc	[JOINT_0]OUTPUT_MAX_LIMIT
+setp lcec.0.EL4032.aout-0-min-dc	[JOINT_0]OUTPUT_MIN_LIMIT
+setp lcec.0.EL4032.aout-0-scale	    [JOINT_0]OUTPUT_SCALE
+setp lcec.0.EL5151-01.enc-pos-scale	[JOINT_0]ENCODER_SCALE
+setp lcec.0.EL4032.aout-0-enable 	1
+
+
+# PID Parameter
+# X-Axis
+setp pid_x.Pgain        [JOINT_0]P
+setp pid_x.Igain        [JOINT_0]I
+setp pid_x.Dgain        [JOINT_0]D
+setp pid_x.bias         [JOINT_0]BIAS
+setp pid_x.FF0          [JOINT_0]FF0
+setp pid_x.FF1          [JOINT_0]FF1
+setp pid_x.FF2          [JOINT_0]FF2
+setp pid_x.deadband     [JOINT_0]DEADBAND
+setp pid_x.maxoutput    [JOINT_0]MAX_OUTPUT
+
+# Hardware Parameter
+# X-Axis
+setp sim-hardware.Xmaxsw-upper          1100
+setp sim-hardware.Xmaxsw-lower          [AXIS_X]MAX_LIMIT
+setp sim-hardware.Xminsw-upper          [AXIS_X]MIN_LIMIT
+setp sim-hardware.Xminsw-lower          -100
+setp sim-hardware.Xhomesw-pos           [AXIS_X]MIN_LIMIT
+setp sim-hardware.Xhomesw-hyst          2
+
+#HAL Connection HAL
+# PID Connect Signals
+# X-Axis
+net pid-x-out	<= 	pid_x.output
+net pid-x-out	 =>	lcec.0.EL4032.aout-0-value
+net pid-x-fb	<= 	lcec.0.EL5151-01.enc-pos
+net pid-x-fb	 =>	pid_x.feedback
+net pid-x-fb	 => joint.0.motor-pos-fb 
+net pid-x-fb	 => sim-hardware.Xcurrent-pos
+net pid-x-cmd	<= 	joint.0.motor-pos-cmd
+net pid-x-cmd	 =>	pid_x.command
+
+# Servo Amp Ready input
+net sv-ready <= motion.motion-enabled
+net sv-ready => pid_x.enable
+net sv-ready => lcec.0.EL2024-01.dout-0
+
+#Limit SW & Homing
+# X-Axis
+net x-plus-limit <= sim-hardware.Xmaxsw-out
+net x-plus-limit => joint.0.pos-lim-sw-in
+net x-minus-limit <= sim-hardware.Xminsw-out
+net x-minus-limit => joint.0.neg-lim-sw-in
+net x-home-sw <= sim-hardware.Xhomesw-out
+net x-home-sw  => joint.0.home-sw-in
+net x-home-index-enable <=> joint.0.index-enable
+net x-home-index-enable <=> pid_x.index-enable
+net x-home-index-enable <=> lcec.0.EL5151-01.enc-index-c-enable
+
+# estop loopback
+net estop-loop iocontrol.0.user-enable-out iocontrol.0.emc-enable-in
+
+#e-stop
+#net EXT_STOP iocontrol.0.emc-enable-in lcec.0.7.din-0

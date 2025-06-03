@@ -98,11 +98,13 @@ typedef struct {
 
     hal_u32_t           max_limit;                                  // Límite máximo de la máquina
     hal_u32_t           min_limit;                                  // Límite mínimo de la máquina
+    hal_float_t         maxa;                                       // Aceleración máxima
+    hal_float_t         maxv;                                       // Velocidad máxima
+    hal_float_t         dmin_percent;                               // Porcentaje de distancia mínima
     hal_float_t         ferror;                                     // Entrada longitud de corte
     hal_bit_t           angle_head_type_actuator;                   // Tipo de actuador para posicionamiento de cabezales
     hal_float_t         min_cut_top_position;                       // Posición del tope mínimo
     hal_float_t         disc_thickness;                              // Espesor del disco de corte
-    // hal_float_t         home_pos;                                  // Posición de home
 
     hal_bit_t           *estop;                                     // Entrada de estop
     hal_u32_t           *status;                                    // Salida de estado
@@ -173,6 +175,8 @@ typedef struct {
     hal_float_t         *cut_left_angle;                            // Entrada Posición cabezal izquierdo
     hal_float_t         *cut_right_angle;                           // Entrada Posición cabezal derecho
     hal_float_t         *move_to_length;                            // Salida de movimiento a
+    hal_float_t         *acc_to_move;                                    // Salida de aceleración
+    hal_float_t         *vel_to_move;                                    // Salida de velocidad
     hal_bit_t           *start_manual_cut;                          // Entrada de inicio de corte manual
     hal_bit_t           *start_auto_cut;                            // Entrada de inicio de corte automático
     hal_bit_t           *start_step_slide_cut;                      // Entrada de inicio de corte paso a paso
@@ -330,6 +334,8 @@ void update_step_slide_cut_list(void *arg, long period);
 // void clear_cut_list(void *arg, long period);
 void print_list(void *arg, long period);
 
+void calc_vel_acc_move(float target, float pos_fb);
+
 /*****************************************************************************/
 // Función para inicializar el componente
 int rtapi_app_main(void) {
@@ -356,6 +362,15 @@ int rtapi_app_main(void) {
     if (retval != 0) goto error;
 
     retval = hal_param_u32_newf(HAL_RW, &(cut_state_machine->min_limit), comp_id, "%s.min-limit", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->maxa), comp_id, "%s.maxa", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->maxv), comp_id, "%s.maxv", prefix);
+    if (retval != 0) goto error;
+
+    retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->dmin_percent), comp_id, "%s.dmin-percent", prefix);
     if (retval != 0) goto error;
 
     retval = hal_param_float_newf(HAL_RW, &(cut_state_machine->ferror), comp_id, "%s.ferror", prefix);
@@ -443,6 +458,14 @@ int rtapi_app_main(void) {
     retval = hal_pin_float_newf(HAL_OUT, &(cut_state_machine->move_to_length), comp_id, "%s.move-to-length", prefix);
     if (retval != 0) goto error;
     *(cut_state_machine->move_to_length) = 0;
+
+    retval = hal_pin_float_newf(HAL_OUT, &(cut_state_machine->acc_to_move), comp_id, "%s.acc-to-move", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->acc_to_move) = cut_state_machine->maxa;
+
+    retval = hal_pin_float_newf(HAL_OUT, &(cut_state_machine->vel_to_move), comp_id, "%s.vel-to-move", prefix);
+    if (retval != 0) goto error;
+    *(cut_state_machine->vel_to_move) = cut_state_machine->maxv;
 
     retval = hal_pin_bit_newf(HAL_IO, &(cut_state_machine->stop_move), comp_id, "%s.stop-move", prefix);
     if (retval != 0) goto error;
@@ -971,6 +994,7 @@ void update_cut_state_machine(void *arg, long period){
                 if (fabs(*(cut_state_machine->pos_fb) - normal_corrected_length) > cut_state_machine->ferror)
                 {
                     *(cut_state_machine->move_to_length) = normal_corrected_length;
+                    calc_vel_acc_move(normal_corrected_length, *(cut_state_machine->pos_fb));
                     cut_state_machine->lenght_in_pos_value = normal_corrected_length;
                     cut_state_machine->state = DEACTIVATE_BREAK;
                 }
@@ -1496,6 +1520,7 @@ void update_cut_state_machine(void *arg, long period){
                 if (fabs(*(cut_state_machine->pos_fb) - short_corrected_length - cut_state_machine->min_cut_top_position) > cut_state_machine->ferror)
                 {
                     *(cut_state_machine->move_to_length) = short_corrected_length + cut_state_machine->min_cut_top_position;
+                    calc_vel_acc_move(short_corrected_length + cut_state_machine->min_cut_top_position, *(cut_state_machine->pos_fb));
                     cut_state_machine->lenght_in_pos_value = short_corrected_length + cut_state_machine->min_cut_top_position;
                     cut_state_machine->state = DEACTIVATE_BREAK;
                 }
@@ -1510,6 +1535,7 @@ void update_cut_state_machine(void *arg, long period){
                     if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->max_limit) > cut_state_machine->ferror)
                     {
                         *(cut_state_machine->move_to_length) = cut_state_machine->max_limit;
+                        calc_vel_acc_move(cut_state_machine->max_limit, *(cut_state_machine->pos_fb));
                         cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit;
                         cut_state_machine->state = DEACTIVATE_BREAK;
                     }
@@ -1538,6 +1564,7 @@ void update_cut_state_machine(void *arg, long period){
                     if (fabs(*(cut_state_machine->pos_fb) - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2)) > cut_state_machine->ferror)
                     {
                         *(cut_state_machine->move_to_length) = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2);
+                        calc_vel_acc_move(cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2), *(cut_state_machine->pos_fb));
                         cut_state_machine->lenght_in_pos_value = cut_state_machine->max_limit - fabs(cut_state_machine->max_limit - cut_state_machine->bottom_cut_length_value - long_correction_disc1 - long_correction_disc2);
                         cut_state_machine->state = DEACTIVATE_BREAK;
                         *(cut_state_machine->status) = PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_LONG_CUT;
@@ -1555,6 +1582,7 @@ void update_cut_state_machine(void *arg, long period){
                     if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->step_slide_target_length) > cut_state_machine->ferror)
                     {
                         *(cut_state_machine->move_to_length) = cut_state_machine->step_slide_target_length;
+                        calc_vel_acc_move(cut_state_machine->step_slide_target_length, *(cut_state_machine->pos_fb));
                         cut_state_machine->lenght_in_pos_value = cut_state_machine->step_slide_target_length;
                         cut_state_machine->state = DEACTIVATE_BREAK;
                     }
@@ -1578,6 +1606,7 @@ void update_cut_state_machine(void *arg, long period){
                     if (fabs(*(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1) > cut_state_machine->ferror)
                     {
                         *(cut_state_machine->move_to_length) = *(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1;
+                        calc_vel_acc_move(*(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1, *(cut_state_machine->pos_fb));
                         cut_state_machine->lenght_in_pos_value = *(cut_state_machine->pos_fb) - cut_state_machine->step_slide_pieces_length - step_slide_correction_disc1;
                         cut_state_machine->state = DEACTIVATE_BREAK;
                         *(cut_state_machine->status) = PRESS_BUSY_HAND_BTNS_FOR_MOVE_TO_RECOVER_LENGTH_STEP_SLIDE_CUT;
@@ -1680,6 +1709,8 @@ void update_cut_state_machine(void *arg, long period){
                         {
                             *(cut_state_machine->homing_break_deactivate) = 1;
                             *(cut_state_machine->move_to_length) = 0;
+                            *(cut_state_machine->vel_to_move) = cut_state_machine->maxv;
+                            *(cut_state_machine->acc_to_move) = cut_state_machine->maxa;
                             *(cut_state_machine->left_head) = 1;
                             *(cut_state_machine->right_head) = 1;
                             cut_state_machine->break_state = WAITING_FOR_HOMING_START_LOW_LEVEL;
@@ -1931,5 +1962,22 @@ void print_list(void *arg, long period) {
             }
             break;
     }
+}
+
+
+void calc_vel_acc_move(float taget, float pos_fb){
+    float dist = fabsf(taget - pos_fb);
+    float dmin = (cut_state_machine->max_limit - cut_state_machine->min_limit) * cut_state_machine->dmin_percent / 100.0;
+
+    // Escalado lineal entre 0 y dmin
+    float scale = (dist < dmin) ? dist / dmin : 1.0;
+    float maxv_dinamic = cut_state_machine->maxv * scale;
+    float maxa_dinamic = cut_state_machine->maxa * scale;
+
+    if (maxv_dinamic < 1.0f) maxv_dinamic = 1.0f; // Asegurar que la velocidad mínima sea 1.0
+    if (maxa_dinamic < 1.0f) maxa_dinamic = 1.0f; // Asegurar que la aceleración mínima sea 1.0
+
+    *(cut_state_machine->vel_to_move) = maxv_dinamic;
+    *(cut_state_machine->acc_to_move) = maxa_dinamic;
 }
 
