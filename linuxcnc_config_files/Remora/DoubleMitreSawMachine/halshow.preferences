@@ -1,8 +1,8 @@
 # Halshow settings
 # This file is generated automatically.
-wm geometry . 698x610+685+140
-placeFrames 0.5685131195335277
-set ::ratio 0.5685131195335277
+wm geometry . 698x610+982+78
+placeFrames 0.4067055393586006
+set ::ratio 0.4067055393586006
 set ::old_w_leftf 160
 set ::watchlist {
     pin+joint.0.motor-pos-cmd
@@ -11,13 +11,13 @@ set ::watchlist {
     pin+j0.ddt.out
     pin+j0.pid.output
     pin+joint.0.pos-fb
-    pin+cut_sm.left-saw-blade-output-move
-    pin+cut_sm.right-saw-blade-output-move
-    pin+cut_sm.list-cut-left-angle
-    pin+cut_sm.list-line-pathY-to-gui
-    pin+cut_sm.right-saw-blade
-    pin+cut_sm.move-to-length
-    pin+streamer.0.clock
+    pin+j0.smc.maxa
+    pin+j0.smc.maxv
+    pin+cut_sm.acc-to-move
+    pin+cut_sm.vel-to-move
+    pin+sim-hardware.X2homesw-out
+    pin+sim-hardware.Xmaxsw-out
+    pin+sim-hardware.Xminsw-out
 }
 set ::workmode watchhal
 set ::watchInterval 100

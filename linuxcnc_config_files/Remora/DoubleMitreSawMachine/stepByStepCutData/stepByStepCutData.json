@@ -2,36 +2,36 @@
     "table": [
         {
             "length": 1500.0,
-            "pieces": 100.0,
+            "pieces": 250.0,
             "processed_pieces": 0,
             "button_state": false
         },
         {
             "length": 650.0,
-            "pieces": 40.0,
+            "pieces": 150.0,
             "processed_pieces": 0,
             "button_state": false
         },
         {
             "length": 450.0,
-            "pieces": 30.0,
+            "pieces": 100.0,
             "processed_pieces": 0,
             "button_state": false
         },
         {
             "length": 600.0,
-            "pieces": 20.0,
+            "pieces": 50.0,
             "processed_pieces": 0,
             "button_state": false
         },
         {
             "length": 400.0,
-            "pieces": 15.0,
-            "processed_pieces": 2,
-            "button_state": true
+            "pieces": 10.0,
+            "processed_pieces": 0,
+            "button_state": false
         }
     ],
     "start_row": 1,
     "end_row": 5,
-    "global_processed_pieces": 96
+    "global_processed_pieces": 117
 }
